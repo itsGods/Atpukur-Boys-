@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'icon';
   isLoading?: boolean;
 }
 
@@ -13,13 +13,14 @@ export const Button: React.FC<ButtonProps> = ({
   disabled,
   ...props 
 }) => {
-  const baseStyles = "px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed text-sm";
+  const baseStyles = "relative font-semibold transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]";
   
   const variants = {
-    primary: "bg-brand-500 hover:bg-brand-600 text-white shadow-lg shadow-brand-500/20",
-    secondary: "bg-glass-200 hover:bg-glass-300 text-white border border-white/10",
-    danger: "bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/20",
-    ghost: "text-gray-400 hover:text-white hover:bg-white/5",
+    primary: "bg-ios-green text-white rounded-xl py-3.5 px-6 shadow-md shadow-ios-green/20 text-[17px]",
+    secondary: "bg-ios-card2 text-ios-blue rounded-xl py-2 px-4 text-[15px]",
+    danger: "bg-ios-card2 text-ios-red rounded-xl py-2 px-4 text-[15px]",
+    ghost: "text-ios-blue hover:bg-ios-card2/50 rounded-lg py-2 px-4",
+    icon: "p-2 rounded-full text-ios-blue hover:bg-ios-card2/50 active:bg-ios-card2",
   };
 
   return (

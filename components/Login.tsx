@@ -24,73 +24,77 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       if (user) {
         onLogin(user);
       } else {
-        setError("Invalid credentials or account inactive.");
+        setError("Invalid ID or Password");
       }
     } catch (err) {
-      setError("Login service unavailable.");
+      setError("Service Unavailable");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#111b21] flex items-center justify-center p-4 relative overflow-hidden">
-        {/* Background Accents */}
-        <div className="absolute top-0 left-0 w-full h-40 bg-brand-500 z-0"></div>
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 relative overflow-hidden">
         
-        <div className="w-full max-w-md bg-brand-panel z-10 rounded-xl shadow-2xl p-8 border border-white/5 relative">
+        {/* Apple-style Gradient Blob Background */}
+        <div className="absolute top-[-20%] left-[-20%] w-[500px] h-[500px] bg-ios-blue/20 rounded-full blur-[100px] opacity-50 animate-pulse"></div>
+        <div className="absolute bottom-[-20%] right-[-20%] w-[500px] h-[500px] bg-ios-green/20 rounded-full blur-[100px] opacity-30"></div>
+
+        <div className="w-full max-w-sm z-10 flex flex-col items-center animate-fade-in">
           
-          <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 bg-brand-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-brand-500/30">
-               <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          <div className="mb-10 flex flex-col items-center">
+            <div className="w-20 h-20 bg-gradient-to-br from-ios-green to-teal-600 rounded-[22px] flex items-center justify-center shadow-2xl shadow-ios-green/20 mb-6">
+               <svg className="w-10 h-10 text-white drop-shadow-md" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
                </svg>
             </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">PrivaTeam</h1>
-            <p className="text-gray-400 text-sm mt-2">Secure Team Communication</p>
+            <h1 className="text-[28px] font-bold text-white tracking-tight">PrivaTeam</h1>
+            <p className="text-ios-gray text-[17px] mt-1">Sign in with your Team ID</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="bg-brand-darker p-4 rounded-lg border border-yellow-500/10 mb-4">
-              <p className="text-xs text-yellow-500/80 text-center leading-relaxed">
-                <span className="font-bold block mb-1">Restricted Access</span>
-                Only authorized personnel with Admin-generated credentials may access this system.
-              </p>
+          <form onSubmit={handleSubmit} className="w-full space-y-6">
+            <div className="space-y-4">
+                <Input 
+                  label="User ID" 
+                  value={username} 
+                  onChange={e => setUsername(e.target.value)}
+                  placeholder="name@team"
+                  className="bg-ios-card2/50 backdrop-blur-md"
+                />
+                
+                <Input 
+                  label="Password" 
+                  type="password"
+                  value={password} 
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="Required"
+                  className="bg-ios-card2/50 backdrop-blur-md"
+                />
             </div>
 
-            <Input 
-              label="User ID" 
-              value={username} 
-              onChange={e => setUsername(e.target.value)}
-              placeholder="Enter your username"
-            />
-            
-            <Input 
-              label="Password" 
-              type="password"
-              value={password} 
-              onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
-            />
-
             {error && (
-              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm text-center">
+              <p className="text-ios-red text-center text-sm font-medium animate-pulse">
                 {error}
-              </div>
+              </p>
             )}
 
-            <Button type="submit" className="w-full py-3" isLoading={loading}>
-              Authenticate
+            <Button type="submit" className="w-full mt-4" isLoading={loading}>
+              Sign In
             </Button>
             
-            <div className="text-center">
-                 <span className="text-xs text-gray-500">Default Admin: admin / password123</span>
+            <div className="text-center mt-6">
+                 <button type="button" className="text-ios-blue text-[15px] hover:underline" onClick={() => alert("Contact System Administrator")}>
+                    Forgot Password?
+                 </button>
+            </div>
+            <div className="text-center mt-2">
+                 <span className="text-[11px] text-gray-600 font-mono">admin / password123</span>
             </div>
           </form>
         </div>
         
-        <div className="absolute bottom-6 text-center w-full z-10 text-gray-600 text-xs">
-          End-to-End Encrypted Environment &copy; 2024
+        <div className="absolute bottom-8 text-center w-full z-10">
+           <p className="text-[11px] text-ios-gray/50 tracking-widest uppercase">Secure Environment</p>
         </div>
     </div>
   );

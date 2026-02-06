@@ -6,10 +6,13 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
-    <div className="h-screen h-[100dvh] w-screen bg-brand-dark flex flex-col relative overflow-hidden">
-      {/* Content */}
-      <div className="relative z-10 flex-1 flex flex-col h-full max-w-[1920px] mx-auto w-full p-0 sm:p-4 lg:p-6">
-        <div className="flex-1 bg-brand-darker sm:rounded-2xl border-none sm:border border-white/5 shadow-2xl overflow-hidden flex flex-col sm:flex-row h-full">
+    <div className="h-[100dvh] w-screen bg-black flex flex-col overflow-hidden">
+      {/* 
+        On Desktop: Max width container centered.
+        On Mobile: Full width/height, no borders, native feel.
+      */}
+      <div className="flex-1 flex flex-col h-full w-full sm:max-w-[1200px] sm:mx-auto sm:h-[95dvh] sm:my-auto sm:border sm:border-ios-separator sm:rounded-3xl sm:overflow-hidden sm:shadow-2xl bg-ios-bg">
+        <div className="flex-1 flex flex-col sm:flex-row h-full relative overflow-hidden">
             {children}
         </div>
       </div>

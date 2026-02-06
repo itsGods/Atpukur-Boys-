@@ -1,36 +1,40 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>PrivaTeam | Secure Team Messenger</title>
-    <!-- Tailwind via CDN for simplicity in keeping custom config -->
+    <!-- Tailwind via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
         darkMode: 'class',
         theme: {
           extend: {
             fontFamily: {
-              sans: ['Inter', 'sans-serif'],
+              sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Text', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
             },
             colors: {
-              glass: {
-                100: 'rgba(255, 255, 255, 0.1)',
-                200: 'rgba(255, 255, 255, 0.2)',
-                300: 'rgba(255, 255, 255, 0.3)',
-                dark: 'rgba(0, 0, 0, 0.3)',
-              },
-              brand: {
-                500: '#00a884', // WhatsApp-ish green but modernized
-                600: '#008f6f',
-                dark: '#111b21',
-                darker: '#0b141a',
-                panel: '#202c33',
-                incoming: '#202c33',
-                outgoing: '#005c4b',
+              ios: {
+                bg: '#000000',
+                card: '#1C1C1E',
+                card2: '#2C2C2E',
+                separator: '#38383A',
+                blue: '#0A84FF',
+                green: '#30D158',
+                greenGradient: '#28cd41',
+                red: '#FF453A',
+                gray: '#8E8E93',
+                lightGray: '#AEAEB2',
+                systemGray6: '#1C1C1E',
+                systemGray5: '#2C2C2E',
               }
+            },
+            spacing: {
+              'safe-top': 'env(safe-area-inset-top)',
+              'safe-bottom': 'env(safe-area-inset-bottom)',
             }
           }
         }
@@ -41,27 +45,28 @@
         height: 100%;
         margin: 0;
         padding: 0;
-        overflow: hidden; /* Prevent body scroll, handle inside app */
-        background-color: #0b141a;
-        color: #e9edef;
-        touch-action: manipulation; /* Improves touch response */
+        overflow: hidden;
+        background-color: #000000;
+        color: #FFFFFF;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-font-smoothing: antialiased;
       }
       #root {
         height: 100%;
+        width: 100%;
       }
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 6px;
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
       }
-      ::-webkit-scrollbar-track {
-        background: transparent;
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
       }
-      ::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 3px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.2);
+      /* Proper iOS blur support */
+      .glass-morphism {
+        background-color: rgba(28, 28, 30, 0.85);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
       }
     </style>
   <script type="importmap">
