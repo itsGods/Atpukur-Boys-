@@ -48,8 +48,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
                </svg>
             </div>
-            <h1 className="text-[28px] font-bold text-white tracking-tight">PrivaTeam</h1>
-            <p className="text-ios-gray text-[17px] mt-1">Sign in with your Team ID</p>
+            <h1 className="text-[28px] font-bold text-white tracking-tight">Atpukur Boys</h1>
+            <p className="text-ios-gray text-[17px] mt-1">Login with your Team ID</p>
           </div>
 
           <form onSubmit={handleSubmit} className="w-full space-y-6">
@@ -79,22 +79,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             )}
 
             <Button type="submit" className="w-full mt-4" isLoading={loading}>
-              Sign In
+              Login
             </Button>
-            
-            <div className="text-center mt-6">
-                 <button type="button" className="text-ios-blue text-[15px] hover:underline" onClick={() => alert("Contact System Administrator")}>
-                    Forgot Password?
-                 </button>
-            </div>
-            <div className="text-center mt-2">
-                 <span className="text-[11px] text-gray-600 font-mono">admin / password123</span>
-            </div>
           </form>
-        </div>
-        
-        <div className="absolute bottom-8 text-center w-full z-10">
-           <p className="text-[11px] text-ios-gray/50 tracking-widest uppercase">Secure Environment</p>
         </div>
     </div>
   );

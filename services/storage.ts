@@ -64,10 +64,15 @@ export class SupabaseService {
         
         if (users) {
             this.cachedUsers = JSON.parse(users);
+            // Force update admin password for existing local data if it exists (simple migration)
+            const admin = this.cachedUsers.find(u => u.username === 'admin');
+            if (admin && admin.password === 'password') {
+                admin.password = 'Habib0000';
+            }
         } else {
             // Seed Default Users if nothing exists
             this.cachedUsers = [
-                { id: 'admin-01', username: 'admin', password: 'password', role: UserRole.ADMIN, isOnline: false, isActive: true, lastSeen: Date.now() },
+                { id: 'admin-01', username: 'admin', password: 'Habib0000', role: UserRole.ADMIN, isOnline: false, isActive: true, lastSeen: Date.now() },
                 { id: 'user-01', username: 'alice', password: 'password', role: UserRole.MEMBER, isOnline: false, isActive: true, lastSeen: Date.now() },
                 { id: 'user-02', username: 'bob', password: 'password', role: UserRole.MEMBER, isOnline: false, isActive: true, lastSeen: Date.now() }
             ];

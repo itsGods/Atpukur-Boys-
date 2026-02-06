@@ -157,7 +157,7 @@ function App() {
                                </div>
                                <p className="text-[15px] text-ios-gray truncate pr-4">
                                   {lastMsg ? lastMsg.content : <span className="text-ios-gray/50 italic">Start a conversation</span>}
-                               </p>
+                                </p>
                            </div>
                        </div>
                    );
@@ -228,7 +228,7 @@ function App() {
                   </div>
 
                   <p className="text-center text-ios-gray/30 text-xs">
-                      PrivaTeam v1.0.2<br/>
+                      Atpukur Boys v1.0.2<br/>
                       Secure End-to-End Environment
                   </p>
               </div>
