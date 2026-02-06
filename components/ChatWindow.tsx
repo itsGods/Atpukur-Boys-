@@ -3,13 +3,15 @@ import { Message, User, UserRole, MessageStatus } from '../types';
 import { mockService } from '../services/storage';
 import { geminiService } from '../services/geminiService';
 import { Button } from './ui/Button';
+import { Avatar } from './ui/Avatar';
 
 interface ChatWindowProps {
   currentUser: User;
+  activeChatId: string; // 'general' or userId
   onBack?: () => void;
 }
 
-export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, onBack }) => {
+export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, activeChatId, onBack }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [users, setUsers] = useState<User[]>([]);
@@ -29,7 +31,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, onBack }) =
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-  }, [messages]);
+  }, [messages, activeChatId]); // Scroll when messages change OR chat changes
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +39,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, onBack }) =
     try {
       await mockService.sendMessage({
         senderId: currentUser.id,
+        receiverId: activeChatId === 'general' ? undefined : activeChatId,
         content: inputText.trim(),
         status: MessageStatus.SENT,
         isSystem: false,
@@ -47,9 +50,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, onBack }) =
 
   const handleSummarize = async () => {
     setIsSummarizing(true);
-    const summary = await geminiService.summarizeChat(messages);
+    const summary = await geminiService.summarizeChat(getFilteredMessages());
     await mockService.sendMessage({
       senderId: 'system-ai',
+      receiverId: activeChatId === 'general' ? undefined : activeChatId,
       content: `📝 **Team AI Summary**:\n\n${summary}`,
       isSystem: true,
       status: MessageStatus.SENT
@@ -64,11 +68,34 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, onBack }) =
 
   const getSender = (id: string) => users.find(u => u.id === id);
 
+  // Filter messages based on active context
+  const getFilteredMessages = () => {
+      return messages.filter(msg => {
+          if (activeChatId === 'general') {
+              // Show messages that have NO receiver OR receiver is explicitly 'general'
+              return !msg.receiverId || msg.receiverId === 'general';
+          } else {
+              // DM Logic: Show messages between Current User AND Active Chat User
+              const isMyMsg = msg.senderId === currentUser.id && msg.receiverId === activeChatId;
+              const isTheirMsg = msg.senderId === activeChatId && msg.receiverId === currentUser.id;
+              return isMyMsg || isTheirMsg;
+          }
+      });
+  };
+
+  const filteredMessages = getFilteredMessages();
+
+  // Header Logic
+  const isGeneral = activeChatId === 'general';
+  const chatPartner = users.find(u => u.id === activeChatId);
+  const title = isGeneral ? 'General Team' : chatPartner?.username || 'Unknown';
+  const onlineCount = isGeneral ? users.filter(u => u.isOnline).length : (chatPartner?.isOnline ? 1 : 0);
+  const subtitle = isGeneral ? `${onlineCount} members online` : (chatPartner?.isOnline ? 'Online' : 'Offline');
+
   return (
     <div className="flex flex-col h-full bg-black relative w-full">
       
       {/* iOS HEADER - Glassmorphic with Safe Area */}
-      {/* We use pt-safe-top to push content down below the notch/status bar */}
       <div className="absolute top-0 left-0 right-0 glass-morphism border-b border-white/10 z-30 pt-safe-top">
         <div className="h-[44px] flex items-center justify-between px-2">
             {/* Back Button */}
@@ -81,13 +108,21 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, onBack }) =
             
             {/* Center Title */}
             <div className="flex flex-col items-center justify-center absolute left-1/2 -translate-x-1/2 w-48 pointer-events-none">
-                <div className="flex items-center gap-1.5">
-                    {/* Tiny Status Dot */}
-                    <div className="w-2 h-2 rounded-full bg-ios-green shadow-[0_0_8px_rgba(48,209,88,0.6)]"></div>
-                    <span className="text-[17px] font-semibold text-white tracking-tight">General Team</span>
+                <div className="flex items-center gap-2">
+                    {/* Icon/Avatar */}
+                    {isGeneral ? (
+                        <div className="w-5 h-5 rounded-full bg-ios-green flex items-center justify-center shadow-sm">
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                        </div>
+                    ) : (
+                         <div className="w-5 h-5 rounded-full overflow-hidden">
+                             <Avatar name={chatPartner?.username || '?'} src={chatPartner?.avatarUrl} size="sm" className="w-full h-full" />
+                         </div>
+                    )}
+                    <span className="text-[17px] font-semibold text-white tracking-tight truncate max-w-[120px]">{title}</span>
                 </div>
                 <span className="text-[11px] text-ios-gray font-medium tracking-wide">
-                    {users.filter(u => u.isOnline).length} members online
+                    {subtitle}
                 </span>
             </div>
 
@@ -105,14 +140,18 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, onBack }) =
       </div>
 
       {/* Messages Area */}
-      {/* pt-[calc(env(safe-area-inset-top)+44px)] ensures content starts below header */}
       <div className="flex-1 overflow-y-auto pt-[calc(env(safe-area-inset-top)+45px)] pb-[calc(env(safe-area-inset-bottom)+60px)] px-4 bg-black no-scrollbar w-full">
         <div className="py-4 space-y-1">
-        {messages.map((msg, idx) => {
+        {filteredMessages.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center pt-20 text-ios-gray opacity-50 space-y-2">
+                <span className="text-4xl">💬</span>
+                <span className="text-sm">No messages yet</span>
+            </div>
+        ) : filteredMessages.map((msg, idx) => {
           const isMe = msg.senderId === currentUser.id;
           const sender = getSender(msg.senderId);
           const isSystem = msg.isSystem || msg.senderId === 'system' || msg.senderId === 'system-ai';
-          const isConsecutive = idx > 0 && messages[idx - 1].senderId === msg.senderId && (msg.timestamp - messages[idx - 1].timestamp < 60000);
+          const isConsecutive = idx > 0 && filteredMessages[idx - 1].senderId === msg.senderId && (msg.timestamp - filteredMessages[idx - 1].timestamp < 60000);
 
           if (isSystem) {
              return (
@@ -126,7 +165,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, onBack }) =
 
           return (
             <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} ${isConsecutive ? 'mt-[2px]' : 'mt-3'}`}>
-              {!isMe && !isConsecutive && (
+              {!isMe && !isConsecutive && isGeneral && (
                   <span className="text-[11px] text-ios-gray/60 ml-3 mb-1 font-medium">{sender?.username}</span>
               )}
               

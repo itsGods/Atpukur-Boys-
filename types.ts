@@ -23,6 +23,7 @@ export interface User {
 export interface Message {
   id: string;
   senderId: string;
+  receiverId?: string; // Optional: If null/undefined/'general', it is a group message
   content: string;
   timestamp: number;
   status: MessageStatus;

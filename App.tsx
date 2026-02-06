@@ -15,6 +15,7 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
+  const [activeChatId, setActiveChatId] = useState<string>('general'); // 'general' or userId
   const [searchQuery, setSearchQuery] = useState('');
 
   // Initial Data Load & Subscription
@@ -56,14 +57,20 @@ function App() {
   });
 
   const getLastMessage = (userId: string) => {
-      const userMsgs = messages.filter(m => m.senderId === userId && !m.isSystem);
-      if (userMsgs.length === 0) return null;
-      return userMsgs[userMsgs.length - 1];
+      // Find last message exchanged between current user and this specific user
+      const dmMsgs = messages.filter(m => 
+        (m.senderId === currentUser.id && m.receiverId === userId) ||
+        (m.senderId === userId && m.receiverId === currentUser.id)
+      );
+      if (dmMsgs.length === 0) return null;
+      return dmMsgs[dmMsgs.length - 1];
   };
 
   const getLastGeneralMessage = () => {
-      if (messages.length === 0) return null;
-      return messages[messages.length - 1];
+      // General messages have no receiverId or it is 'general'
+      const genMsgs = messages.filter(m => !m.receiverId || m.receiverId === 'general');
+      if (genMsgs.length === 0) return null;
+      return genMsgs[genMsgs.length - 1];
   };
 
   const lastGeneralMsg = getLastGeneralMessage();
@@ -77,6 +84,11 @@ function App() {
      } catch (e) {
          return '';
      }
+  };
+
+  const openChat = (chatId: string) => {
+      setActiveChatId(chatId);
+      setMobileView('chat');
   };
 
   return (
@@ -120,8 +132,8 @@ function App() {
                  {/* Pinned General Chat */}
                  {!searchQuery && (
                     <div 
-                      onClick={() => setMobileView('chat')}
-                      className="flex items-center gap-3 px-4 py-2 active:bg-ios-card2 transition-colors cursor-pointer group"
+                      onClick={() => openChat('general')}
+                      className={`flex items-center gap-3 px-4 py-2 active:bg-ios-card2 transition-colors cursor-pointer group ${activeChatId === 'general' ? 'bg-white/5 sm:bg-ios-card2' : ''}`}
                     >
                         <div className="w-[52px] h-[52px] rounded-full bg-gradient-to-b from-ios-green to-[#28c840] flex items-center justify-center text-white shrink-0 shadow-md">
                             <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -159,8 +171,8 @@ function App() {
                    return (
                        <div 
                          key={user.id} 
-                         onClick={() => setMobileView('chat')} 
-                         className="flex items-center gap-3 px-4 py-2 active:bg-ios-card2 transition-colors cursor-pointer"
+                         onClick={() => openChat(user.id)} 
+                         className={`flex items-center gap-3 px-4 py-2 active:bg-ios-card2 transition-colors cursor-pointer ${activeChatId === user.id ? 'bg-white/5 sm:bg-ios-card2' : ''}`}
                        >
                            <div className="relative">
                                <Avatar name={user.username} src={user.avatarUrl} size="lg" className="ring-1 ring-white/10 rounded-full" />
@@ -206,7 +218,11 @@ function App() {
           ${mobileView === 'chat' ? 'flex' : 'hidden'} 
           sm:flex flex-1 flex-col relative w-full h-full bg-black z-30
       `}>
-         <ChatWindow currentUser={currentUser} onBack={() => setMobileView('list')} />
+         <ChatWindow 
+            currentUser={currentUser} 
+            activeChatId={activeChatId}
+            onBack={() => setMobileView('list')} 
+         />
       </div>
 
       {/* Admin Modal */}
