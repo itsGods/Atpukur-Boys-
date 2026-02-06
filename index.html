@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content" />
     <title>PrivaTeam | Secure Team Messenger</title>
     <!-- Tailwind via CDN for simplicity in keeping custom config -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -44,6 +44,7 @@
         overflow: hidden; /* Prevent body scroll, handle inside app */
         background-color: #0b141a;
         color: #e9edef;
+        touch-action: manipulation; /* Improves touch response */
       }
       #root {
         height: 100%;

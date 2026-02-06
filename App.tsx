@@ -13,7 +13,9 @@ function App() {
   const [users, setUsers] = useState<User[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  
+  // Mobile Navigation State: 'list' (Sidebar) or 'chat' (ChatWindow)
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Initial Data Load & Subscription
@@ -38,6 +40,14 @@ function App() {
       mockService.logout(currentUser.id);
     }
     setCurrentUser(null);
+  };
+
+  const openChat = () => {
+    setMobileView('chat');
+  };
+
+  const backToList = () => {
+    setMobileView('list');
   };
 
   if (!currentUser) {
@@ -83,12 +93,13 @@ function App() {
   return (
     <Layout>
       {/* Sidebar - Chat List Style */}
+      {/* On Mobile: Hidden if mobileView is 'chat'. Always Flex on SM+ */}
       <div className={`
-          ${isSidebarOpen ? 'flex' : 'hidden'} 
-          sm:flex flex-col w-full sm:w-96 border-r border-white/5 bg-brand-panel z-20 absolute sm:relative h-full
+          ${mobileView === 'list' ? 'flex' : 'hidden'} 
+          sm:flex flex-col w-full sm:w-96 border-r border-white/5 bg-brand-panel z-20 h-full
       `}>
          {/* Sidebar Header */}
-         <div className="p-4 bg-brand-panel border-b border-white/5 flex justify-between items-center shrink-0 h-16">
+         <div className="p-3 sm:p-4 bg-brand-panel border-b border-white/5 flex justify-between items-center shrink-0 h-16">
             <div className="flex items-center gap-3">
                <Avatar name={currentUser.username} src={currentUser.avatarUrl} isOnline={true} />
                <div className="overflow-hidden">
@@ -113,7 +124,7 @@ function App() {
          </div>
 
          {/* Search */}
-         <div className="p-3 bg-brand-panel shrink-0">
+         <div className="p-2 sm:p-3 bg-brand-panel shrink-0">
              <div className="relative">
                 <input 
                   value={searchQuery}
@@ -136,7 +147,10 @@ function App() {
              {!searchQuery && (
                  <>
                     <div className="px-3 pt-2">
-                        <div className="flex items-center gap-3 p-3 bg-brand-darker/50 rounded-lg cursor-pointer border-l-4 border-brand-500 transition-colors hover:bg-brand-darker">
+                        <div 
+                          onClick={openChat}
+                          className="flex items-center gap-3 p-3 bg-brand-darker/50 rounded-lg cursor-pointer border-l-4 border-brand-500 transition-colors hover:bg-brand-darker"
+                        >
                             <div className="w-12 h-12 rounded-full bg-brand-500 flex items-center justify-center text-white shrink-0">
                                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -185,7 +199,11 @@ function App() {
                  filteredUsers.map(user => {
                    const lastMsg = getLastMessage(user.id);
                    return (
-                       <div key={user.id} className="p-3 rounded-lg flex items-center gap-3 hover:bg-white/5 transition-colors cursor-pointer group">
+                       <div 
+                         key={user.id} 
+                         onClick={openChat} 
+                         className="p-3 rounded-lg flex items-center gap-3 hover:bg-white/5 transition-colors cursor-pointer group"
+                       >
                            <div className="relative">
                                <Avatar name={user.username} src={user.avatarUrl} size="lg" />
                                {user.isOnline && (
@@ -218,8 +236,12 @@ function App() {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col relative w-full h-full bg-[#0b141a]">
-         <ChatWindow currentUser={currentUser} />
+      {/* On Mobile: Hidden if mobileView is 'list'. Always Flex on SM+ */}
+      <div className={`
+          ${mobileView === 'chat' ? 'flex' : 'hidden'} 
+          sm:flex flex-1 flex-col relative w-full h-full bg-[#0b141a]
+      `}>
+         <ChatWindow currentUser={currentUser} onBack={backToList} />
       </div>
 
       {/* Admin Modal */}

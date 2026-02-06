@@ -6,9 +6,10 @@ import { Button } from './ui/Button';
 
 interface ChatWindowProps {
   currentUser: User;
+  onBack?: () => void;
 }
 
-export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser }) => {
+export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, onBack }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [users, setUsers] = useState<User[]>([]);
@@ -85,22 +86,35 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser }) => {
     <div className="flex flex-col h-full bg-[#0b141a] relative w-full">
       
       {/* Header */}
-      <div className="bg-brand-panel py-3 px-4 flex justify-between items-center border-b border-white/5 z-10 shadow-sm shrink-0 h-16">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-brand-500 flex items-center justify-center text-white cursor-pointer hover:bg-brand-600 transition-colors">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="bg-brand-panel py-2 px-3 sm:py-3 sm:px-4 flex justify-between items-center border-b border-white/5 z-10 shadow-sm shrink-0 h-14 sm:h-16">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Back Button (Mobile Only) */}
+          {onBack && (
+            <button 
+                onClick={onBack}
+                className="sm:hidden p-1.5 -ml-1 text-gray-400 hover:text-white rounded-full active:bg-white/10"
+            >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+            </button>
+          )}
+
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-brand-500 flex items-center justify-center text-white shrink-0">
+            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
           </div>
-          <div className="cursor-pointer">
-            <h3 className="font-semibold text-white">General Team</h3>
-            <p className="text-xs text-gray-400">{users.filter(u => u.isOnline).length} online, {users.length} members</p>
+          <div className="cursor-pointer min-w-0">
+            <h3 className="font-semibold text-white text-sm sm:text-base truncate">General Team</h3>
+            <p className="text-xs text-gray-400 truncate">{users.filter(u => u.isOnline).length} online</p>
           </div>
         </div>
         <div className="flex gap-2">
             {process.env.API_KEY && (
                 <Button variant="secondary" onClick={handleSummarize} isLoading={isSummarizing} className="text-xs py-1.5 px-3">
-                    ✨ AI Summary
+                    <span className="hidden sm:inline">✨ AI Summary</span>
+                    <span className="sm:hidden">✨ AI</span>
                 </Button>
             )}
         </div>
@@ -131,7 +145,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser }) => {
           if (isSystem) {
              return (
                  <div key={msg.id} className="flex justify-center my-4 animate-fade-in relative z-10">
-                     <div className="bg-brand-panel/80 text-gray-300 text-xs px-3 py-1.5 rounded-lg shadow-sm border border-white/5 backdrop-blur-sm max-w-lg text-center whitespace-pre-wrap">
+                     <div className="bg-brand-panel/80 text-gray-300 text-xs px-3 py-1.5 rounded-lg shadow-sm border border-white/5 backdrop-blur-sm max-w-[85%] sm:max-w-lg text-center whitespace-pre-wrap">
                         {msg.content}
                      </div>
                  </div>
@@ -187,8 +201,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser }) => {
       </div>
 
       {/* Input Area */}
-      <div className="bg-brand-panel px-4 py-3 border-t border-white/5 z-20 shrink-0">
-        <form onSubmit={handleSendMessage} className="flex gap-4 items-end max-w-4xl mx-auto w-full">
+      <div className="bg-brand-panel px-3 py-2 sm:px-4 sm:py-3 border-t border-white/5 z-20 shrink-0 safe-pb">
+        <form onSubmit={handleSendMessage} className="flex gap-2 sm:gap-4 items-end max-w-4xl mx-auto w-full">
           <Button variant="ghost" type="button" className="p-2 text-gray-400 hover:text-white rounded-full hover:bg-white/5 hidden sm:block shrink-0 transition-colors">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -202,13 +216,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser }) => {
           </Button>
           
           <input 
-            className="flex-1 bg-brand-darker text-white placeholder-gray-500 rounded-lg px-4 py-3 border border-white/5 focus:outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/50 transition-all min-w-0"
+            className="flex-1 bg-brand-darker text-white placeholder-gray-500 rounded-lg px-4 py-2.5 sm:py-3 border border-white/5 focus:outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/50 transition-all min-w-0 text-sm sm:text-base"
             placeholder="Type a message..."
             value={inputText}
             onChange={e => setInputText(e.target.value)}
           />
 
-          <Button type="submit" className="p-3 rounded-full bg-brand-500 hover:bg-brand-600 shadow-lg shrink-0 transition-transform active:scale-95" disabled={!inputText.trim()}>
+          <Button type="submit" className="p-2.5 sm:p-3 rounded-full bg-brand-500 hover:bg-brand-600 shadow-lg shrink-0 transition-transform active:scale-95" disabled={!inputText.trim()}>
             {inputText.trim() ? (
                 <svg className="w-5 h-5 translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
