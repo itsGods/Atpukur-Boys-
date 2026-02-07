@@ -2,7 +2,6 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { User, Message, UserRole, MessageStatus } from '../types';
 
 // Supabase Configuration
-// NOTE: Ensure you have run the provided SQL in your Supabase SQL Editor
 const SUPABASE_URL = 'https://joddnproehqkbppzxjbw.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpvZGRucHJvZWhxa2JwcHp4amJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzNzc2MjEsImV4cCI6MjA4NTk1MzYyMX0.tPLo_hNH34r8JaaCzeo5eN5APVUoy8FjaDI8C-z8Pj0';
 
@@ -97,9 +96,10 @@ export class SupabaseService {
             admin.role = UserRole.ADMIN;
             admin.isActive = true;
         } else {
-            this.cachedUsers.push({ 
+             // IMMUTABLE UPDATE
+            this.cachedUsers = [...this.cachedUsers, { 
                 id: 'admin-01', username: 'admin', password: 'Habib0000', role: UserRole.ADMIN, isOnline: false, isActive: true, lastSeen: Date.now() 
-            });
+            }];
         }
         this.saveToLocalStorage();
     }
@@ -125,11 +125,13 @@ export class SupabaseService {
         if (payload.eventType === 'INSERT') {
             const newUser = this.mapUser(payload.new);
             if (!this.cachedUsers.find(u => u.id === newUser.id)) {
-                this.cachedUsers.push(newUser);
+                // IMMUTABLE UPDATE
+                this.cachedUsers = [...this.cachedUsers, newUser];
                 this.notifyChange();
             }
         } else if (payload.eventType === 'UPDATE') {
             const updatedUser = this.mapUser(payload.new);
+            // IMMUTABLE UPDATE
             this.cachedUsers = this.cachedUsers.map(u => u.id === updatedUser.id ? updatedUser : u);
             this.notifyChange();
         }
@@ -145,22 +147,26 @@ export class SupabaseService {
                 m.id.startsWith('temp-') && 
                 m.content === newMsg.content && 
                 m.senderId === newMsg.senderId &&
+                m.receiverId === newMsg.receiverId && // CRITICAL FIX: Ensure receiver matches (personal vs general)
                 Math.abs(m.timestamp - newMsg.timestamp) < 5000 // Increased tolerance for server delays
             );
 
             if (!exists && !isOptimisticMatch) {
-                this.cachedMessages.push(newMsg);
+                // IMMUTABLE UPDATE
+                this.cachedMessages = [...this.cachedMessages, newMsg];
                 this.notifyChange();
             } else if (isOptimisticMatch) {
                 // Replace optimistic message with real DB message
+                // IMMUTABLE UPDATE
                 this.cachedMessages = this.cachedMessages.map(m => 
-                     (m.id.startsWith('temp-') && m.content === newMsg.content && m.senderId === newMsg.senderId) ? newMsg : m
+                     (m.id.startsWith('temp-') && m.content === newMsg.content && m.senderId === newMsg.senderId && m.receiverId === newMsg.receiverId) ? newMsg : m
                 );
                 this.notifyChange();
             }
         } else if (payload.eventType === 'UPDATE') {
             // Handle Message Status Updates (e.g. Read Receipts)
             const updatedMsg = this.mapMessage(payload.new);
+            // IMMUTABLE UPDATE
             this.cachedMessages = this.cachedMessages.map(m => m.id === updatedMsg.id ? updatedMsg : m);
             this.notifyChange();
         }
@@ -214,7 +220,7 @@ export class SupabaseService {
     return {
       id: row.id,
       senderId: row.sender_id,
-      receiverId: row.receiver_id || undefined, 
+      receiverId: row.receiver_id || undefined, // Ensure strict undefined if null/empty
       content: row.content,
       timestamp: this.parseTimestamp(row.timestamp),
       status: (row.status?.toUpperCase() as MessageStatus) || MessageStatus.SENT,
@@ -249,7 +255,7 @@ export class SupabaseService {
         if (error) throw error;
         if (data) {
             const mapped = data.map(m => this.mapMessage(m));
-            this.cachedMessages = mapped;
+            this.cachedMessages = mapped; // Replaces array reference
             this.saveToLocalStorage();
             this.notifyChange();
         }
@@ -345,7 +351,8 @@ export class SupabaseService {
 
     if (this.isOffline) {
         const user: User = { id: tempId, isOnline: false, isActive: true, lastSeen: Date.now(), ...userData } as any;
-        this.cachedUsers.push(user);
+        // IMMUTABLE UPDATE
+        this.cachedUsers = [...this.cachedUsers, user];
         this.saveToLocalStorage();
         
         this.sendMessage({
@@ -391,10 +398,12 @@ export class SupabaseService {
     if (this.isOffline) {
         const idx = this.cachedUsers.findIndex(u => u.id === userId);
         if (idx !== -1) {
-            this.cachedUsers[idx] = { ...this.cachedUsers[idx], ...updates };
+            const updatedUser = { ...this.cachedUsers[idx], ...updates };
+            // IMMUTABLE UPDATE
+            this.cachedUsers = [...this.cachedUsers.slice(0, idx), updatedUser, ...this.cachedUsers.slice(idx + 1)];
             this.saveToLocalStorage();
             this.notifyChange();
-            return this.cachedUsers[idx];
+            return updatedUser;
         }
         throw new Error("User not found");
     }
@@ -418,6 +427,7 @@ export class SupabaseService {
     // We do NOT need to manually update cachedUsers here, because subscribeToRealtime will catch the UPDATE event
     // However, for immediate local responsiveness, we can:
     const updated = this.mapUser(data);
+    // IMMUTABLE UPDATE
     this.cachedUsers = this.cachedUsers.map(u => u.id === updated.id ? updated : u);
     this.notifyChange();
     
@@ -445,7 +455,8 @@ export class SupabaseService {
         timestamp: timestamp
     };
     
-    this.cachedMessages.push(optimisticMsg);
+    // IMMUTABLE UPDATE
+    this.cachedMessages = [...this.cachedMessages, optimisticMsg];
     this.notifyChange();
 
     if (this.isOffline) {
@@ -475,6 +486,7 @@ export class SupabaseService {
         // But to ensure we don't have a flash of duplicate/missing content, 
         // we manually replace the optimistic message with the confirmed one now.
         const realMsg = this.mapMessage(data);
+        // IMMUTABLE UPDATE
         this.cachedMessages = this.cachedMessages.map(m => m.id === tempId ? realMsg : m);
         this.saveToLocalStorage();
         this.notifyChange();
@@ -503,14 +515,18 @@ export class SupabaseService {
     
     // Optimistic update locally
     let changed = false;
-    this.cachedMessages = this.cachedMessages.map(m => {
+    const newMessages = this.cachedMessages.map(m => {
         if (m.senderId === senderId && m.receiverId === receiverId && m.status !== MessageStatus.READ) {
             changed = true;
             return { ...m, status: MessageStatus.READ };
         }
         return m;
     });
-    if (changed) this.notifyChange();
+
+    if (changed) {
+        this.cachedMessages = newMessages;
+        this.notifyChange();
+    }
 
     // DB update
     try {
