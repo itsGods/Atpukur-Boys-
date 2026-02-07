@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Message, User, UserRole, MessageStatus } from '../types';
 import { mockService } from '../services/storage';
-import { geminiService } from '../services/geminiService';
 import { Button } from './ui/Button';
 import { Avatar } from './ui/Avatar';
 
@@ -16,7 +15,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, activeChatI
   const [inputText, setInputText] = useState('');
   const [users, setUsers] = useState<User[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [isSummarizing, setIsSummarizing] = useState(false);
 
   useEffect(() => {
     const fetchData = () => {
@@ -63,18 +61,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, activeChatI
     } catch (err) { console.error(err); }
   };
 
-  const handleSummarize = async () => {
-    setIsSummarizing(true);
-    const summary = await geminiService.summarizeChat(getFilteredMessages());
-    await mockService.sendMessage({
-      senderId: 'system-ai',
-      receiverId: activeChatId === 'general' ? undefined : activeChatId,
-      content: `AI_ANALYSIS_COMPLETE:\n\n${summary}`,
-      isSystem: true,
-      status: MessageStatus.SENT
-    });
-    setIsSummarizing(false);
-  };
+  // --- Helpers ---
 
   const formatTime = (ts: number) => {
     if (!ts || isNaN(ts)) return '';
@@ -136,20 +123,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, activeChatI
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3">
-                {process.env.API_KEY && (
-                    <button 
-                        onClick={handleSummarize} 
-                        disabled={isSummarizing}
-                        className="group relative flex items-center justify-center w-10 h-10 border border-hacker-cyan/30 hover:bg-hacker-cyan/10 transition-all"
-                        title="AI SUMMARIZE"
-                    >
-                         <svg className={`w-5 h-5 text-hacker-cyan transition-all ${isSummarizing ? 'animate-spin' : 'group-hover:scale-110'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                         {/* Corner accents */}
-                         <div className="absolute top-0 right-0 w-1 h-1 bg-hacker-cyan"></div>
-                         <div className="absolute bottom-0 left-0 w-1 h-1 bg-hacker-cyan"></div>
-                    </button>
-                )}
+            <div className="flex gap-3 items-center">
+                {/* No actions currently */}
             </div>
         </div>
         
@@ -161,6 +136,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, activeChatI
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto pt-[calc(env(safe-area-inset-top)+80px)] pb-[calc(env(safe-area-inset-bottom)+80px)] px-4 sm:px-8 bg-transparent no-scrollbar w-full relative">
+        
         <div className="py-6 space-y-6">
         {filteredMessages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center pt-20 text-hacker-muted opacity-50 space-y-4 font-mono select-none">
