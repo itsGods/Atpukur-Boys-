@@ -6,15 +6,12 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
-    <div className="h-[100dvh] w-screen flex flex-col bg-black overflow-hidden relative font-sans">
-      {/* Background Grid */}
-      <div className="absolute inset-0 z-0 opacity-10" style={{ 
-          backgroundImage: 'linear-gradient(rgba(0, 255, 65, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 255, 65, 0.1) 1px, transparent 1px)',
-          backgroundSize: '20px 20px'
-      }}></div>
-
-      {/* Main Container */}
-      <div className="flex-1 flex flex-col sm:flex-row h-full w-full sm:max-w-[1600px] sm:mx-auto sm:h-[95dvh] sm:my-auto bg-hacker-black sm:border sm:border-hacker-border shadow-2xl overflow-hidden relative z-10">
+    <div className="h-[100dvh] w-screen bg-black flex justify-center overflow-hidden">
+      {/* 
+        Container constraints for large screens (iPad/Desktop).
+        On mobile, it takes full width/height.
+      */}
+      <div className="w-full h-full sm:max-w-[1400px] sm:h-[95dvh] sm:my-auto sm:rounded-3xl sm:border sm:border-ios-separator/50 sm:shadow-2xl overflow-hidden bg-ios-bg relative flex">
          {children}
       </div>
     </div>
