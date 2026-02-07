@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { User, Message, UserRole, MessageStatus } from '../types';
 
 // Supabase Configuration
+// NOTE: Ensure you have run the provided SQL in your Supabase SQL Editor
 const SUPABASE_URL = 'https://joddnproehqkbppzxjbw.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpvZGRucHJvZWhxa2JwcHp4amJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzNzc2MjEsImV4cCI6MjA4NTk1MzYyMX0.tPLo_hNH34r8JaaCzeo5eN5APVUoy8FjaDI8C-z8Pj0';
 
@@ -113,17 +114,68 @@ export class SupabaseService {
   private subscribeToRealtime() {
     if (this.isOffline) return;
 
+    // Remove existing channels if any to prevent duplicates
+    this.supabase.getChannels().forEach(channel => {
+        this.supabase.removeChannel(channel);
+    });
+
     this.supabase.channel('public:db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
-        this.fetchUsers().then(() => this.notifyChange());
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload) => {
+        // Handle User Updates
+        if (payload.eventType === 'INSERT') {
+            const newUser = this.mapUser(payload.new);
+            if (!this.cachedUsers.find(u => u.id === newUser.id)) {
+                this.cachedUsers.push(newUser);
+                this.notifyChange();
+            }
+        } else if (payload.eventType === 'UPDATE') {
+            const updatedUser = this.mapUser(payload.new);
+            this.cachedUsers = this.cachedUsers.map(u => u.id === updatedUser.id ? updatedUser : u);
+            this.notifyChange();
+        }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
-        this.fetchMessages().then(() => this.notifyChange());
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
+        // Handle Message Updates
+        if (payload.eventType === 'INSERT') {
+            const newMsg = this.mapMessage(payload.new);
+            
+            // Deduplicate: Check if message exists (by ID) or matches a temporary optimistic message
+            const exists = this.cachedMessages.some(m => m.id === newMsg.id);
+            const isOptimisticMatch = this.cachedMessages.some(m => 
+                m.id.startsWith('temp-') && 
+                m.content === newMsg.content && 
+                m.senderId === newMsg.senderId &&
+                Math.abs(m.timestamp - newMsg.timestamp) < 5000 // Increased tolerance for server delays
+            );
+
+            if (!exists && !isOptimisticMatch) {
+                this.cachedMessages.push(newMsg);
+                this.notifyChange();
+            } else if (isOptimisticMatch) {
+                // Replace optimistic message with real DB message
+                this.cachedMessages = this.cachedMessages.map(m => 
+                     (m.id.startsWith('temp-') && m.content === newMsg.content && m.senderId === newMsg.senderId) ? newMsg : m
+                );
+                this.notifyChange();
+            }
+        } else if (payload.eventType === 'UPDATE') {
+            // Handle Message Status Updates (e.g. Read Receipts)
+            const updatedMsg = this.mapMessage(payload.new);
+            this.cachedMessages = this.cachedMessages.map(m => m.id === updatedMsg.id ? updatedMsg : m);
+            this.notifyChange();
+        }
       })
       .subscribe((status) => {
+          console.log("Realtime Status:", status);
+          if (status === 'SUBSCRIBED') {
+              this.isOffline = false;
+              // Sync once on connect to fill gaps
+              this.fetchMessages();
+              this.fetchUsers();
+          }
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
               console.warn("Realtime error, switching offline");
-              this.isOffline = true;
+              // Could trigger a UI 'Reconnecting...' state here
           }
       });
   }
@@ -179,6 +231,7 @@ export class SupabaseService {
         if (data) {
             this.cachedUsers = data.map(u => this.mapUser(u));
             this.saveToLocalStorage(); 
+            this.notifyChange();
         }
     } catch (e) {
         console.error("Fetch users failed", e);
@@ -198,6 +251,7 @@ export class SupabaseService {
             const mapped = data.map(m => this.mapMessage(m));
             this.cachedMessages = mapped;
             this.saveToLocalStorage();
+            this.notifyChange();
         }
     } catch (e) {
         console.error("Fetch messages failed", e);
@@ -305,13 +359,21 @@ export class SupabaseService {
         return user;
     }
 
+    // Explicitly add 'id' with tempId to allow creation, supabase will usually ignore if serial/uuid default, 
+    // but here we are using text ID for users
+    const userPayload = { ...userData, id: tempId };
+
     const { data, error } = await this.supabase
       .from('users')
-      .insert(userData)
+      .insert(userPayload)
       .select()
       .single();
 
-    if (error || !data) throw new Error(error?.message || "Failed to create user");
+    if (error || !data) {
+        // Fallback for demo if DB insert fails (e.g., duplicate ID collision on random generation)
+        console.error("User creation error", error);
+        throw new Error(error?.message || "Failed to create user");
+    }
 
     const createdUser = this.mapUser(data);
     
@@ -322,9 +384,6 @@ export class SupabaseService {
       status: MessageStatus.SENT,
     });
 
-    await this.fetchUsers();
-    this.notifyChange();
-    
     return createdUser;
   }
 
@@ -355,11 +414,14 @@ export class SupabaseService {
       .single();
 
     if (error || !data) throw new Error(error?.message || "Failed to update user");
-
-    await this.fetchUsers();
+    
+    // We do NOT need to manually update cachedUsers here, because subscribeToRealtime will catch the UPDATE event
+    // However, for immediate local responsiveness, we can:
+    const updated = this.mapUser(data);
+    this.cachedUsers = this.cachedUsers.map(u => u.id === updated.id ? updated : u);
     this.notifyChange();
     
-    return this.mapUser(data);
+    return updated;
   }
 
   // --- Messaging ---
@@ -371,6 +433,7 @@ export class SupabaseService {
   async sendMessage(messageData: Omit<Message, 'id' | 'timestamp'>): Promise<Message> {
     const timestamp = Date.now();
     
+    // 1. Optimistic Update (Immediate Feedback)
     const tempId = `temp-${timestamp}-${Math.random().toString(36).substr(2, 9)}`;
     const optimisticMsg: Message = {
         id: tempId,
@@ -382,7 +445,7 @@ export class SupabaseService {
         timestamp: timestamp
     };
     
-    this.cachedMessages = [...this.cachedMessages, optimisticMsg];
+    this.cachedMessages.push(optimisticMsg);
     this.notifyChange();
 
     if (this.isOffline) {
@@ -408,6 +471,9 @@ export class SupabaseService {
 
         if (error) throw error;
 
+        // The realtime subscription will eventually see this insert.
+        // But to ensure we don't have a flash of duplicate/missing content, 
+        // we manually replace the optimistic message with the confirmed one now.
         const realMsg = this.mapMessage(data);
         this.cachedMessages = this.cachedMessages.map(m => m.id === tempId ? realMsg : m);
         this.saveToLocalStorage();
@@ -417,6 +483,8 @@ export class SupabaseService {
 
     } catch (e) {
         console.error("Send failed", e);
+        // Keep optimistic message but mark as potential error state? 
+        // For now, we leave it as 'SENT' locally.
         return optimisticMsg;
     }
   }
@@ -428,6 +496,33 @@ export class SupabaseService {
       .from('messages')
       .update({ status })
       .eq('id', messageId);
+  }
+
+  async markMessagesAsRead(senderId: string, receiverId: string) {
+    if (this.isOffline) return;
+    
+    // Optimistic update locally
+    let changed = false;
+    this.cachedMessages = this.cachedMessages.map(m => {
+        if (m.senderId === senderId && m.receiverId === receiverId && m.status !== MessageStatus.READ) {
+            changed = true;
+            return { ...m, status: MessageStatus.READ };
+        }
+        return m;
+    });
+    if (changed) this.notifyChange();
+
+    // DB update
+    try {
+        await this.supabase
+        .from('messages')
+        .update({ status: MessageStatus.READ })
+        .eq('sender_id', senderId)
+        .eq('receiver_id', receiverId)
+        .neq('status', MessageStatus.READ);
+    } catch (e) {
+        console.error("Failed to mark as read", e);
+    }
   }
 
   private notifyChange() {

@@ -25,9 +25,24 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, activeChatI
     };
     fetchData();
     const unsubscribe = mockService.subscribe(fetchData);
-    const interval = setInterval(fetchData, 3000);
+    // Realtime is primary, but we poll every 10s as a fallback sync
+    const interval = setInterval(fetchData, 10000);
     return () => { unsubscribe(); clearInterval(interval); };
   }, []);
+
+  // Mark as Read when opening chat or receiving new messages
+  useEffect(() => {
+    if (activeChatId !== 'general') {
+        const unreadExists = messages.some(m => 
+            m.senderId === activeChatId && 
+            m.receiverId === currentUser.id && 
+            m.status !== MessageStatus.READ
+        );
+        if (unreadExists) {
+            mockService.markMessagesAsRead(activeChatId, currentUser.id);
+        }
+    }
+  }, [messages, activeChatId, currentUser.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
