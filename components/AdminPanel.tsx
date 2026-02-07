@@ -123,7 +123,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
                      <div className="flex items-center gap-2">
                          <div className="w-1.5 h-1.5 bg-hacker-green animate-pulse rounded-full"></div>
                          <span className="text-[10px] text-hacker-green tracking-widest uppercase">Secure Connection</span>
-                         {successMsg && <span className="ml-4 text-[10px] text-hacker-green bg-hacker-green/10 border border-hacker-green px-2 py-0.5 animate-pulse">>> {successMsg}</span>}
+                         {successMsg && <span className="ml-4 text-[10px] text-hacker-green bg-hacker-green/10 border border-hacker-green px-2 py-0.5 animate-pulse">{`>>`} {successMsg}</span>}
                      </div>
                  </div>
             </div>

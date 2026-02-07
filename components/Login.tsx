@@ -153,7 +153,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     )}
 
                     <Button type="submit" className="w-full h-12 text-base shadow-[0_0_20px_rgba(0,255,65,0.1)]" isLoading={loading}>
-                      <span className="mr-2">>></span> INITIATE_LOGIN
+                      <span className="mr-2">{`>>`}</span> INITIATE_LOGIN
                     </Button>
                 </form>
 
