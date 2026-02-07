@@ -31,7 +31,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, activeChatI
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-  }, [messages, activeChatId]); // Scroll when messages change OR chat changes
+  }, [messages, activeChatId]); 
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +54,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, activeChatI
     await mockService.sendMessage({
       senderId: 'system-ai',
       receiverId: activeChatId === 'general' ? undefined : activeChatId,
-      content: `📝 **Team AI Summary**:\n\n${summary}`,
+      content: `AI_ANALYSIS_COMPLETE:\n\n${summary}`,
       isSystem: true,
       status: MessageStatus.SENT
     });
@@ -63,19 +63,16 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, activeChatI
 
   const formatTime = (ts: number) => {
     if (!ts || isNaN(ts)) return '';
-    return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
   };
 
   const getSender = (id: string) => users.find(u => u.id === id);
 
-  // Filter messages based on active context
   const getFilteredMessages = () => {
       return messages.filter(msg => {
           if (activeChatId === 'general') {
-              // Show messages that have NO receiver OR receiver is explicitly 'general'
               return !msg.receiverId || msg.receiverId === 'general';
           } else {
-              // DM Logic: Show messages between Current User AND Active Chat User
               const isMyMsg = msg.senderId === currentUser.id && msg.receiverId === activeChatId;
               const isTheirMsg = msg.senderId === activeChatId && msg.receiverId === currentUser.id;
               return isMyMsg || isTheirMsg;
@@ -85,67 +82,77 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, activeChatI
 
   const filteredMessages = getFilteredMessages();
 
-  // Header Logic
   const isGeneral = activeChatId === 'general';
   const chatPartner = users.find(u => u.id === activeChatId);
-  const title = isGeneral ? 'General Team' : chatPartner?.username || 'Unknown';
-  const onlineCount = isGeneral ? users.filter(u => u.isOnline).length : (chatPartner?.isOnline ? 1 : 0);
-  const subtitle = isGeneral ? `${onlineCount} members online` : (chatPartner?.isOnline ? 'Online' : 'Offline');
+  const title = isGeneral ? 'GENERAL_CHANNEL' : chatPartner?.username.toUpperCase() || 'UNKNOWN_TARGET';
+  const subtitle = isGeneral ? 'BROADCASTING' : (chatPartner?.isOnline ? 'LINK: ACTIVE' : 'LINK: SEVERED');
 
   return (
-    <div className="flex flex-col h-full bg-black relative w-full">
+    <div className="flex flex-col h-full bg-hacker-black relative w-full font-sans bg-noise bg-[size:40px_40px] bg-grid-pattern">
       
-      {/* iOS HEADER - Glassmorphic with Safe Area */}
-      <div className="absolute top-0 left-0 right-0 glass-morphism border-b border-white/10 z-30 pt-safe-top">
-        <div className="h-[44px] flex items-center justify-between px-2">
+      {/* HUD Header */}
+      <div className="absolute top-0 left-0 right-0 bg-hacker-black/90 backdrop-blur-md border-b border-hacker-border z-30 pt-safe-top shadow-[0_5px_30px_rgba(0,0,0,0.8)]">
+        <div className="h-[70px] flex items-center justify-between px-4 sm:px-6">
             {/* Back Button */}
-            <Button variant="ghost" onClick={onBack} className="sm:hidden pl-2 pr-4 text-ios-blue flex items-center gap-1 active:opacity-50 transition-opacity hover:bg-transparent">
-                <svg width="12" height="20" viewBox="0 0 12 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M10.5 1.5L2 10L10.5 18.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span className="text-[17px] font-normal -mt-0.5">Chats</span>
+            <Button variant="ghost" onClick={onBack} className="sm:hidden px-0 text-hacker-green hover:bg-transparent mr-4">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             </Button>
             
-            {/* Center Title */}
-            <div className="flex flex-col items-center justify-center absolute left-1/2 -translate-x-1/2 w-48 pointer-events-none">
-                <div className="flex items-center gap-2">
-                    {/* Icon/Avatar */}
-                    {isGeneral ? (
-                        <div className="w-5 h-5 rounded-full bg-ios-green flex items-center justify-center shadow-sm">
-                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                        </div>
-                    ) : (
-                         <div className="w-5 h-5 rounded-full overflow-hidden">
-                             <Avatar name={chatPartner?.username || '?'} src={chatPartner?.avatarUrl} size="sm" className="w-full h-full" />
-                         </div>
-                    )}
-                    <span className="text-[17px] font-semibold text-white tracking-tight truncate max-w-[120px]">{title}</span>
+            {/* Target Info */}
+            <div className="flex items-center gap-4 flex-1">
+                {isGeneral ? (
+                    <div className="w-10 h-10 border border-hacker-green/50 flex items-center justify-center bg-hacker-green/5 relative overflow-hidden group">
+                        <span className="text-hacker-green font-bold text-lg">#</span>
+                        <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-hacker-green"></div>
+                        <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-hacker-green"></div>
+                    </div>
+                ) : (
+                    <Avatar name={chatPartner?.username || '?'} src={chatPartner?.avatarUrl} size="md" className="border-hacker-green/50" />
+                )}
+                <div className="flex flex-col">
+                    <span className="text-lg font-bold text-white tracking-widest font-mono glitch-text" data-text={title}>{title}</span>
+                    <div className="flex items-center gap-2">
+                         <div className={`w-1.5 h-1.5 ${isGeneral || chatPartner?.isOnline ? 'bg-hacker-green shadow-[0_0_5px_#00FF41]' : 'bg-hacker-red'} animate-pulse`}></div>
+                         <span className={`text-[10px] font-mono tracking-[0.2em] uppercase ${isGeneral || chatPartner?.isOnline ? 'text-hacker-green' : 'text-hacker-red'}`}>
+                             {subtitle}
+                         </span>
+                    </div>
                 </div>
-                <span className="text-[11px] text-ios-gray font-medium tracking-wide">
-                    {subtitle}
-                </span>
             </div>
 
-            {/* Right Action */}
-            <div className="pr-2">
+            {/* Actions */}
+            <div className="flex gap-3">
                 {process.env.API_KEY && (
-                    <Button variant="icon" onClick={handleSummarize} isLoading={isSummarizing} className="text-ios-blue">
-                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                        </svg>
-                    </Button>
+                    <button 
+                        onClick={handleSummarize} 
+                        disabled={isSummarizing}
+                        className="group relative flex items-center justify-center w-10 h-10 border border-hacker-cyan/30 hover:bg-hacker-cyan/10 transition-all"
+                        title="AI SUMMARIZE"
+                    >
+                         <svg className={`w-5 h-5 text-hacker-cyan transition-all ${isSummarizing ? 'animate-spin' : 'group-hover:scale-110'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                         {/* Corner accents */}
+                         <div className="absolute top-0 right-0 w-1 h-1 bg-hacker-cyan"></div>
+                         <div className="absolute bottom-0 left-0 w-1 h-1 bg-hacker-cyan"></div>
+                    </button>
                 )}
             </div>
+        </div>
+        
+        {/* Progress Bar Decoration */}
+        <div className="h-[1px] w-full bg-hacker-border relative overflow-hidden">
+             <div className="absolute top-0 left-0 h-full w-2/3 bg-gradient-to-r from-transparent via-hacker-green to-transparent animate-[scanline_2s_linear_infinite] transform -translate-x-full opacity-50"></div>
         </div>
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto pt-[calc(env(safe-area-inset-top)+45px)] pb-[calc(env(safe-area-inset-bottom)+60px)] px-4 bg-black no-scrollbar w-full">
-        <div className="py-4 space-y-1">
+      <div className="flex-1 overflow-y-auto pt-[calc(env(safe-area-inset-top)+80px)] pb-[calc(env(safe-area-inset-bottom)+80px)] px-4 sm:px-8 bg-transparent no-scrollbar w-full relative">
+        <div className="py-6 space-y-6">
         {filteredMessages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center pt-20 text-ios-gray opacity-50 space-y-2">
-                <span className="text-4xl">💬</span>
-                <span className="text-sm">No messages yet</span>
+            <div className="h-full flex flex-col items-center justify-center pt-20 text-hacker-muted opacity-50 space-y-4 font-mono select-none">
+                <div className="w-20 h-20 border border-hacker-muted/30 flex items-center justify-center rounded-full animate-pulse">
+                    <span className="text-4xl text-hacker-green">_</span>
+                </div>
+                <span className="text-xs tracking-[0.3em] uppercase">No_Packets_Received</span>
             </div>
         ) : filteredMessages.map((msg, idx) => {
           const isMe = msg.senderId === currentUser.id;
@@ -155,51 +162,49 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, activeChatI
 
           if (isSystem) {
              return (
-                 <div key={msg.id} className="flex justify-center my-6">
-                     <span className="text-[11px] font-medium text-ios-gray/80 text-center bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm">
-                        {msg.content}
-                     </span>
+                 <div key={msg.id} className="flex flex-col items-center my-8 space-y-2 opacity-80 hover:opacity-100 transition-opacity">
+                     <div className="flex items-center gap-4 w-full justify-center">
+                        <div className="h-px w-12 bg-gradient-to-r from-transparent to-hacker-green/50"></div>
+                        <span className="text-[10px] font-mono text-hacker-green tracking-widest text-center uppercase border border-hacker-green/30 bg-hacker-green/5 px-4 py-1">
+                            {msg.content}
+                        </span>
+                        <div className="h-px w-12 bg-gradient-to-l from-transparent to-hacker-green/50"></div>
+                     </div>
                  </div>
              )
           }
 
           return (
-            <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} ${isConsecutive ? 'mt-[2px]' : 'mt-3'}`}>
+            <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} ${isConsecutive ? 'mt-1' : 'mt-6'}`}>
               {!isMe && !isConsecutive && isGeneral && (
-                  <span className="text-[11px] text-ios-gray/60 ml-3 mb-1 font-medium">{sender?.username}</span>
+                  <div className="flex items-center gap-2 mb-1 ml-1">
+                      <span className="text-[10px] text-hacker-cyan font-bold font-mono tracking-wide">{sender?.username.toUpperCase()}</span>
+                      <span className="text-[8px] text-hacker-muted font-mono">{formatTime(msg.timestamp)}</span>
+                  </div>
               )}
               
               <div className={`
-                 max-w-[75%] px-[12px] py-[8px] text-[16px] leading-[1.35] relative group shadow-sm
-                 ${isMe 
-                    ? 'bg-gradient-to-br from-ios-green to-[#28c840] text-white rounded-[18px] rounded-tr-[4px]' 
-                    : 'bg-[#262628] text-white rounded-[18px] rounded-tl-[4px]'
-                 }
+                 max-w-[85%] sm:max-w-[65%] text-sm relative group
+                 ${isMe ? 'text-right' : 'text-left'}
               `}>
-                <p className="break-words font-normal tracking-wide">{msg.content}</p>
+                <div className={`
+                    relative px-5 py-3 
+                    ${isMe 
+                        ? 'bg-hacker-green/10 text-hacker-text clip-message-sent border-r-2 border-hacker-green' 
+                        : 'bg-hacker-panel text-hacker-text clip-message-received border-l-2 border-hacker-border'
+                    }
+                `}>
+                    <p className="break-words font-mono text-[13px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                </div>
                 
                 {/* Meta Data */}
-                <div className={`flex items-center justify-end gap-1 mt-0.5 select-none ${isMe ? 'opacity-80' : 'opacity-40'}`}>
-                    <span className={`text-[10px] ${isMe ? 'text-white' : 'text-ios-gray'}`}>
-                        {formatTime(msg.timestamp)}
-                    </span>
-                    {isMe && (
-                       <div className="w-3 h-3 flex items-center">
-                           {msg.status === MessageStatus.READ ? (
-                               // Double Check (Blue/White)
-                               <svg viewBox="0 0 16 11" fill="none" className="w-full h-full text-white">
-                                    <path d="M1 6L4.5 9.5L11.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                    <path d="M5 6L8.5 9.5L15.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                               </svg>
-                           ) : (
-                               // Single Check
-                               <svg viewBox="0 0 16 11" fill="none" className="w-full h-full text-white/70">
-                                   <path d="M1.5 6L5 9.5L14 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                               </svg>
-                           )}
-                       </div>
-                    )}
-                </div>
+                {isMe && (
+                    <div className="flex items-center justify-end gap-2 mt-1 select-none pr-1">
+                        <span className="text-[8px] text-hacker-muted font-mono tracking-tighter uppercase">
+                            {formatTime(msg.timestamp)} :: {msg.status === MessageStatus.READ ? 'ACK' : 'SENT'}
+                        </span>
+                    </div>
+                )}
               </div>
             </div>
           );
@@ -208,41 +213,26 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, activeChatI
         </div>
       </div>
 
-      {/* iOS INPUT BAR - Glassmorphic with Safe Area Bottom */}
-      <div className="absolute bottom-0 w-full glass-morphism border-t border-white/10 pb-safe-bottom z-40">
-        <form onSubmit={handleSendMessage} className="flex items-end gap-3 px-3 py-2">
+      {/* Input Console */}
+      <div className="absolute bottom-0 w-full bg-hacker-black/95 backdrop-blur-xl border-t border-hacker-border pb-safe-bottom z-40">
+        <div className="h-[2px] w-full bg-gradient-to-r from-hacker-green via-hacker-cyan to-hacker-green opacity-30"></div>
+        <form onSubmit={handleSendMessage} className="flex items-center gap-0 p-2 sm:p-4">
             
-            {/* Plus Button */}
-            <Button variant="ghost" type="button" className="p-0 w-[30px] h-[36px] text-ios-blue hover:bg-transparent active:opacity-50 shrink-0 mb-[2px]">
-               <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                   <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-               </svg>
-            </Button>
+            <div className="flex items-center justify-center w-10 h-10 text-hacker-green animate-pulse font-mono text-xl">{`>`}</div>
             
-            {/* Pill Input */}
-            <div className="flex-1 bg-[#1C1C1E] border border-[#3A3A3C] rounded-full min-h-[36px] flex items-center px-4 py-1.5 focus-within:border-ios-gray/50 transition-colors">
+            <div className="flex-1 bg-hacker-panel/50 border border-hacker-border/50 focus-within:border-hacker-green/50 flex items-center mr-2 relative clip-tech-border">
                 <input 
-                    className="flex-1 bg-transparent text-white placeholder-[#8E8E93] focus:outline-none text-[16px] leading-5 max-h-24 py-1"
-                    placeholder="iMessage"
+                    className="flex-1 bg-transparent text-hacker-text placeholder-hacker-muted/40 focus:outline-none text-sm font-mono h-[46px] px-4 w-full"
+                    placeholder="ENTER_COMMAND..."
                     value={inputText}
                     onChange={e => setInputText(e.target.value)}
+                    autoComplete="off"
                 />
             </div>
 
-            {/* Send Button - Animated */}
-            {inputText.trim() ? (
-                <Button type="submit" className="w-[34px] h-[34px] rounded-full bg-ios-blue text-white flex items-center justify-center shadow-lg active:scale-95 transition-all mb-[2px]">
-                    <svg className="w-5 h-5 ml-0.5 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 12h14M12 5l7 7-7 7" />
-                    </svg>
-                </Button>
-            ) : (
-                <Button type="button" className="w-[30px] h-[36px] text-ios-blue/40 flex items-center justify-center mb-[2px]">
-                   <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                   </svg>
-                </Button>
-            )}
+            <Button type="submit" disabled={!inputText.trim()} className="h-[46px] px-6 bg-hacker-green/10 border border-hacker-green/50 text-hacker-green hover:bg-hacker-green hover:text-black font-bold uppercase tracking-widest text-xs transition-all clip-tech-border shadow-[0_0_10px_rgba(0,255,65,0.1)] hover:shadow-[0_0_20px_rgba(0,255,65,0.4)]">
+                SEND
+            </Button>
         </form>
       </div>
     </div>

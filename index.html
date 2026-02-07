@@ -5,7 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Atpukur Boys | Secure Team Messenger</title>
+    <title>Atpukur Boys | Secure Terminal</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
     <!-- Tailwind via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -14,27 +20,72 @@
         theme: {
           extend: {
             fontFamily: {
-              sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Text', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+              sans: ['Rajdhani', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
             },
             colors: {
-              ios: {
-                bg: '#000000',
-                card: '#1C1C1E',
-                card2: '#2C2C2E',
-                separator: '#38383A',
-                blue: '#0A84FF',
-                green: '#30D158',
-                greenGradient: '#28cd41',
-                red: '#FF453A',
-                gray: '#8E8E93',
-                lightGray: '#AEAEB2',
-                systemGray6: '#1C1C1E',
-                systemGray5: '#2C2C2E',
+              hacker: {
+                black: '#020202',
+                panel: '#080808',
+                border: '#2a2a2a',
+                green: '#00FF41',
+                greenDim: 'rgba(0, 255, 65, 0.05)',
+                cyan: '#00F3FF',
+                red: '#FF003C',
+                gold: '#FFD700',
+                text: '#E0E0E0',
+                muted: '#606060'
               }
+            },
+            backgroundImage: {
+              'grid-pattern': "linear-gradient(to right, #1a1a1a 1px, transparent 1px), linear-gradient(to bottom, #1a1a1a 1px, transparent 1px)",
+              'noise': "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22 opacity=%220.05%22/%3E%3C/svg%3E')",
             },
             spacing: {
               'safe-top': 'env(safe-area-inset-top)',
               'safe-bottom': 'env(safe-area-inset-bottom)',
+            },
+            animation: {
+              'scanline': 'scanline 6s linear infinite',
+              'glitch-1': 'glitch-anim-1 2.5s infinite linear alternate-reverse',
+              'glitch-2': 'glitch-anim-2 3s infinite linear alternate-reverse',
+              'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'typing': 'typing 2s steps(20)',
+              'blink': 'blink .7s step-end infinite',
+              'matrix-fade': 'matrixFade 0.5s ease-in forwards',
+            },
+            keyframes: {
+              scanline: {
+                '0%': { transform: 'translateY(-100%)' },
+                '100%': { transform: 'translateY(100%)' }
+              },
+              'glitch-anim-1': {
+                '0%': { clipPath: 'inset(20% 0 80% 0)' },
+                '20%': { clipPath: 'inset(60% 0 10% 0)' },
+                '40%': { clipPath: 'inset(40% 0 50% 0)' },
+                '60%': { clipPath: 'inset(80% 0 5% 0)' },
+                '80%': { clipPath: 'inset(10% 0 60% 0)' },
+                '100%': { clipPath: 'inset(30% 0 30% 0)' },
+              },
+              'glitch-anim-2': {
+                '0%': { clipPath: 'inset(10% 0 60% 0)' },
+                '20%': { clipPath: 'inset(30% 0 10% 0)' },
+                '40%': { clipPath: 'inset(70% 0 20% 0)' },
+                '60%': { clipPath: 'inset(20% 0 50% 0)' },
+                '80%': { clipPath: 'inset(50% 0 40% 0)' },
+                '100%': { clipPath: 'inset(5% 0 80% 0)' },
+              },
+              typing: {
+                '0%': { width: '0' },
+                '100%': { width: '100%' },
+              },
+              blink: {
+                '50%': { borderColor: 'transparent' },
+              },
+              matrixFade: {
+                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              }
             }
           }
         }
@@ -46,27 +97,106 @@
         margin: 0;
         padding: 0;
         overflow: hidden;
-        background-color: #000000;
-        color: #FFFFFF;
+        background-color: #020202;
+        color: #E0E0E0;
+        font-family: 'Rajdhani', sans-serif;
         -webkit-tap-highlight-color: transparent;
-        -webkit-font-smoothing: antialiased;
       }
-      #root {
-        height: 100%;
+      
+      /* Noise Overlay */
+      .bg-noise::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22 opacity=%220.04%22/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 50;
+        mix-blend-mode: overlay;
+      }
+
+      /* Hacker Scrollbar */
+      ::-webkit-scrollbar {
+        width: 4px;
+        background: #050505;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #1f1f1f;
+        border: 1px solid #000;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #00FF41;
+      }
+
+      /* CRT Effect */
+      .crt::after {
+        content: " ";
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        right: 0;
+        background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+        z-index: 60;
+        background-size: 100% 2px, 3px 100%;
+        pointer-events: none;
+      }
+
+      /* Clip Paths for Tech Shapes */
+      .clip-tech-border {
+        clip-path: polygon(
+          0 10px, 
+          10px 0, 
+          100% 0, 
+          100% calc(100% - 10px), 
+          calc(100% - 10px) 100%, 
+          0 100%
+        );
+      }
+      
+      .clip-message-sent {
+        clip-path: polygon(
+          10px 0, 
+          100% 0, 
+          100% 100%, 
+          0 100%, 
+          0 10px
+        );
+      }
+
+      .clip-message-received {
+         clip-path: polygon(
+          0 0, 
+          calc(100% - 10px) 0, 
+          100% 10px, 
+          100% 100%, 
+          0 100%
+        );
+      }
+
+      .glitch-text {
+        position: relative;
+      }
+      .glitch-text::before,
+      .glitch-text::after {
+        content: attr(data-text);
+        position: absolute;
+        top: 0;
+        left: 0;
         width: 100%;
+        height: 100%;
       }
-      .no-scrollbar::-webkit-scrollbar {
-        display: none;
+      .glitch-text::before {
+        left: 2px;
+        text-shadow: -1px 0 #ff00c1;
+        clip-path: inset(44% 0 61% 0);
+        animation: glitch-anim-1 2s infinite linear alternate-reverse;
       }
-      .no-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-      /* Proper iOS blur support */
-      .glass-morphism {
-        background-color: rgba(28, 28, 30, 0.85);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
+      .glitch-text::after {
+        left: -2px;
+        text-shadow: -1px 0 #00fff9;
+        clip-path: inset(54% 0 6% 0);
+        animation: glitch-anim-2 3s infinite linear alternate-reverse;
       }
     </style>
   <script type="importmap">

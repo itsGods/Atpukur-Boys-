@@ -17,10 +17,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
   const [searchQuery, setSearchQuery] = useState('');
   const [broadcastText, setBroadcastText] = useState('');
   
-  // Stats
   const [stats, setStats] = useState({ users: 0, online: 0, messages: 0 });
-
-  // Form State
   const [formData, setFormData] = useState({ username: '', password: '', role: UserRole.MEMBER });
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -44,12 +41,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
     e.preventDefault();
     setError('');
     try {
-      if (!formData.username || !formData.password) throw new Error("Username and Password required");
+      if (!formData.username || !formData.password) throw new Error("CREDENTIALS_MISSING");
       await mockService.createUser(formData);
       setFormData({ username: '', password: '', role: UserRole.MEMBER });
       setView('dashboard');
       loadData();
-      showSuccess("User created successfully");
+      showSuccess("UNIT_INITIALIZED");
     } catch (err: any) {
       setError(err.message);
     }
@@ -58,13 +55,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
   const handleUpdateUser = async () => {
     if (!selectedUser) return;
     try {
-      // If password field is not empty, update it
       const updates: any = { role: formData.role };
       if (formData.password) updates.password = formData.password;
       
       await mockService.updateUser(selectedUser.id, updates);
       loadData();
-      showSuccess("User updated");
+      showSuccess("DB_RECORD_UPDATED");
     } catch (err: any) {
       setError(err.message);
     }
@@ -83,12 +79,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
     
     await mockService.sendMessage({
       senderId: 'system',
-      content: `📢 **ANNOUNCEMENT**\n\n${broadcastText}`,
+      content: `SYSTEM_BROADCAST:\n\n${broadcastText}`,
       isSystem: true,
       status: MessageStatus.SENT
     });
     setBroadcastText('');
-    showSuccess("Broadcast sent to General");
+    showSuccess("PACKET_SENT_ALL");
   };
 
   const showSuccess = (msg: string) => {
@@ -108,244 +104,282 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center sm:p-6 animate-fade-in">
-      <div className="bg-ios-bg w-full h-full sm:h-[85vh] sm:max-w-5xl sm:rounded-3xl border border-white/10 overflow-hidden flex flex-col shadow-2xl relative">
+    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-0 sm:p-8 animate-matrix-fade font-mono">
+      {/* Mainframe Container */}
+      <div className="w-full h-full bg-hacker-black relative flex flex-col overflow-hidden sm:border sm:border-hacker-green/30 sm:shadow-[0_0_60px_rgba(0,255,65,0.1)] bg-noise bg-[size:30px_30px] bg-grid-pattern clip-tech-border">
         
-        {/* Navigation Bar */}
-        <div className="h-[64px] border-b border-white/10 flex items-center justify-between px-4 bg-[#1C1C1E]/80 backdrop-blur-xl z-10 shrink-0">
-          <div className="flex items-center gap-2">
-            {view !== 'dashboard' && (
-              <Button variant="ghost" onClick={() => setView('dashboard')} className="pl-0 text-ios-blue flex items-center gap-1">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                Back
-              </Button>
-            )}
-            {view === 'dashboard' && (
-                <h2 className="text-[20px] font-bold text-white tracking-tight">Admin Dashboard</h2>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-2">
-            {successMsg && <span className="text-ios-green text-sm font-medium animate-pulse">{successMsg}</span>}
-            <Button variant="ghost" onClick={onClose} className="font-semibold text-ios-blue">Done</Button>
-          </div>
+        {/* Top Decorative Bar */}
+        <div className="h-1 w-full bg-gradient-to-r from-hacker-green/0 via-hacker-green/50 to-hacker-green/0"></div>
+        
+        {/* Header */}
+        <div className="h-16 border-b border-hacker-border flex items-center justify-between px-6 bg-hacker-panel/90 backdrop-blur-md shrink-0">
+            {/* Title Block */}
+            <div className="flex items-center gap-4">
+                 <div className="w-8 h-8 border border-hacker-green flex items-center justify-center bg-hacker-green/10 animate-pulse">
+                    <svg className="w-5 h-5 text-hacker-green" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                 </div>
+                 <div>
+                     <h2 className="text-xl font-bold text-white tracking-[0.15em] glitch-text" data-text="ROOT_ACCESS_TERMINAL">ROOT_ACCESS_TERMINAL</h2>
+                     <div className="flex items-center gap-2">
+                         <div className="w-1.5 h-1.5 bg-hacker-green animate-pulse rounded-full"></div>
+                         <span className="text-[10px] text-hacker-green tracking-widest uppercase">Secure Connection</span>
+                         {successMsg && <span className="ml-4 text-[10px] text-hacker-green bg-hacker-green/10 border border-hacker-green px-2 py-0.5 animate-pulse">>> {successMsg}</span>}
+                     </div>
+                 </div>
+            </div>
+
+            {/* Controls */}
+            <div className="flex items-center gap-6">
+                {view !== 'dashboard' && (
+                    <button onClick={() => setView('dashboard')} className="text-hacker-cyan text-xs font-bold tracking-widest hover:text-white transition-colors flex items-center gap-2 group border border-transparent hover:border-hacker-cyan/30 px-3 py-1">
+                        <span>&lt; RETURN_TO_DASHBOARD</span>
+                    </button>
+                )}
+                <div className="h-8 w-px bg-hacker-border hidden sm:block"></div>
+                <button onClick={onClose} className="text-hacker-red text-xs font-bold tracking-widest hover:text-white transition-colors flex items-center gap-2 group border border-hacker-red/30 hover:bg-hacker-red/10 px-3 py-1">
+                    <span>[ TERMINATE_SESSION ]</span>
+                </button>
+            </div>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar bg-black">
-          
-          {/* DASHBOARD VIEW */}
-          {view === 'dashboard' && (
-            <div className="p-4 sm:p-6 space-y-8 max-w-4xl mx-auto">
-              
-              {/* Analytics Cards */}
-              <div className="grid grid-cols-3 gap-3 sm:gap-4">
-                <div className="bg-[#1C1C1E] rounded-xl p-4 border border-white/5">
-                    <div className="text-ios-gray text-xs font-medium uppercase tracking-wider mb-1">Total Users</div>
-                    <div className="text-2xl font-bold text-white">{stats.users}</div>
-                </div>
-                <div className="bg-[#1C1C1E] rounded-xl p-4 border border-white/5">
-                    <div className="text-ios-gray text-xs font-medium uppercase tracking-wider mb-1">Online Now</div>
-                    <div className="text-2xl font-bold text-ios-green">{stats.online}</div>
-                </div>
-                <div className="bg-[#1C1C1E] rounded-xl p-4 border border-white/5">
-                    <div className="text-ios-gray text-xs font-medium uppercase tracking-wider mb-1">Messages</div>
-                    <div className="text-2xl font-bold text-ios-blue">{stats.messages}</div>
-                </div>
-              </div>
-
-              {/* System Broadcast */}
-              <div className="space-y-2">
-                 <h3 className="text-lg font-semibold text-white px-1">System Broadcast</h3>
-                 <div className="bg-[#1C1C1E] rounded-xl p-4 border border-white/5 space-y-3">
-                    <Input 
-                        placeholder="Type an announcement..." 
-                        value={broadcastText}
-                        onChange={(e) => setBroadcastText(e.target.value)}
-                        className="bg-black/50"
-                    />
-                    <div className="flex justify-end">
-                        <Button variant="primary" onClick={handleBroadcast} disabled={!broadcastText} className="py-2 px-4 text-sm bg-ios-blue text-white shadow-none">
-                            Send Announcement
-                        </Button>
-                    </div>
-                 </div>
-              </div>
-
-              {/* User Management */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center px-1">
-                    <h3 className="text-lg font-semibold text-white">Team Members</h3>
-                    <Button variant="icon" onClick={() => { setFormData({username: '', password: '', role: UserRole.MEMBER}); setView('create'); }} className="text-ios-blue">
-                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                    </Button>
-                </div>
-
-                <div className="sticky top-0 z-10 bg-black py-2">
-                     <Input 
-                        variant="search" 
-                        placeholder="Search users..." 
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                     />
-                </div>
-
-                <div className="bg-[#1C1C1E] rounded-xl overflow-hidden border border-white/5 divide-y divide-white/5">
-                   {filteredUsers.map(user => (
-                       <div key={user.id} onClick={() => openUserDetail(user)} className="flex items-center gap-3 p-3 hover:bg-white/5 cursor-pointer active:bg-white/10 transition-colors">
-                           <Avatar name={user.username} src={user.avatarUrl} size="md" className="shrink-0" isOnline={user.isOnline} />
-                           <div className="flex-1 min-w-0">
-                               <div className="flex justify-between">
-                                   <div className="font-medium text-white flex items-center gap-2">
-                                       {user.username}
-                                       {user.role === UserRole.ADMIN && <span className="bg-ios-blue/20 text-ios-blue text-[10px] px-1.5 py-0.5 rounded font-bold">ADMIN</span>}
-                                   </div>
-                                   <div className={`text-xs ${user.isActive ? 'text-ios-gray' : 'text-ios-red'}`}>
-                                       {user.isActive ? 'Active' : 'Inactive'}
-                                   </div>
-                               </div>
-                               <div className="text-xs text-ios-gray truncate">ID: {user.id}</div>
-                           </div>
-                           <svg className="w-5 h-5 text-ios-gray/30" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                       </div>
-                   ))}
-                   {filteredUsers.length === 0 && (
-                       <div className="p-4 text-center text-ios-gray text-sm">No users found.</div>
-                   )}
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* USER DETAIL VIEW */}
-          {view === 'user-detail' && selectedUser && (
-             <div className="p-4 sm:p-8 max-w-2xl mx-auto space-y-6">
-                 
-                 <div className="flex flex-col items-center pb-6 border-b border-white/10">
-                     <Avatar name={selectedUser.username} src={selectedUser.avatarUrl} size="xl" className="mb-4" />
-                     <h2 className="text-2xl font-bold text-white">{selectedUser.username}</h2>
-                     <p className="text-ios-gray text-sm font-mono mt-1">{selectedUser.id}</p>
-                 </div>
-
-                 <div className="space-y-6">
-                     {/* Edit Settings Group */}
-                     <div className="space-y-2">
-                        <label className="text-xs font-medium text-ios-gray uppercase ml-4">Account Settings</label>
-                        <div className="bg-[#1C1C1E] rounded-xl border border-white/5 overflow-hidden">
-                            <div className="p-4 border-b border-white/5 flex items-center justify-between">
-                                <span className="text-white">Role</span>
-                                <select 
-                                    className="bg-transparent text-ios-blue focus:outline-none text-right"
-                                    value={formData.role}
-                                    onChange={(e) => setFormData({...formData, role: e.target.value as UserRole})}
-                                    disabled={selectedUser.id === currentUser.id}
-                                >
-                                    <option value={UserRole.MEMBER}>Member</option>
-                                    <option value={UserRole.ADMIN}>Admin</option>
-                                </select>
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto no-scrollbar p-6 sm:p-10 relative">
+            
+            {/* View: Dashboard */}
+            {view === 'dashboard' && (
+                <div className="max-w-7xl mx-auto space-y-10">
+                    
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {[
+                            { label: 'REGISTERED_UNITS', val: stats.users, color: 'text-white' },
+                            { label: 'ACTIVE_LINKS', val: stats.online, color: 'text-hacker-green' },
+                            { label: 'DATA_PACKETS', val: stats.messages, color: 'text-hacker-cyan' }
+                        ].map((stat, i) => (
+                            <div key={i} className="bg-hacker-panel/40 border border-hacker-border p-6 relative group overflow-hidden">
+                                {/* Hover Effect */}
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-hacker-green/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+                                
+                                <div className="flex justify-between items-start mb-4">
+                                    <span className="text-[10px] text-hacker-muted tracking-[0.2em] font-bold">{stat.label}</span>
+                                    <svg className={`w-4 h-4 ${stat.color} opacity-50`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                                </div>
+                                <div className={`text-5xl font-bold ${stat.color} font-mono tracking-tighter`}>{stat.val}</div>
+                                
+                                {/* Corner Decorations */}
+                                <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-hacker-muted/30 group-hover:border-hacker-green transition-colors"></div>
+                                <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-hacker-muted/30 group-hover:border-hacker-green transition-colors"></div>
                             </div>
-                            <div className="p-4 flex items-center justify-between">
-                                <span className="text-white">Reset Password</span>
+                        ))}
+                    </div>
+
+                    {/* Broadcast Module */}
+                    <div className="border border-hacker-border bg-black/40 p-1 relative">
+                        <div className="absolute top-0 left-0 bg-hacker-green text-black text-[9px] font-bold px-3 py-0.5 tracking-widest">BROADCAST_MODULE_V2</div>
+                        <div className="p-6 pt-8 flex gap-4 items-center">
+                            <div className="flex-1 bg-transparent border-b border-hacker-border focus-within:border-hacker-green transition-colors flex items-center gap-2 py-2">
+                                <span className="text-hacker-green text-sm font-bold">{`>`}</span>
                                 <input 
-                                    type="text" 
-                                    placeholder="Enter new password"
-                                    className="bg-transparent text-right text-white placeholder-ios-gray/50 focus:outline-none w-1/2"
-                                    value={formData.password}
-                                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                                    className="bg-transparent w-full text-hacker-text placeholder-hacker-muted/50 focus:outline-none font-mono text-sm"
+                                    placeholder="ENTER_SYSTEM_ANNOUNCEMENT..."
+                                    value={broadcastText}
+                                    onChange={(e) => setBroadcastText(e.target.value)}
                                 />
                             </div>
+                            <Button onClick={handleBroadcast} disabled={!broadcastText} className="shrink-0 h-10 px-8 text-xs border-hacker-green/50 hover:bg-hacker-green/10">
+                                TRANSMIT
+                            </Button>
                         </div>
-                        <div className="px-4">
-                           <Button onClick={handleUpdateUser} className="w-full bg-ios-blue text-white py-2" disabled={selectedUser.id === currentUser.id && formData.role !== selectedUser.role}>
-                              Save Changes
-                           </Button>
+                    </div>
+
+                    {/* User Database */}
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-end border-b border-hacker-border pb-4">
+                            <h3 className="text-xl font-bold text-white tracking-[0.2em] glitch-text" data-text="DATABASE_ENTRIES">DATABASE_ENTRIES</h3>
+                            <Button variant="secondary" onClick={() => { setFormData({username: '', password: '', role: UserRole.MEMBER}); setView('create'); }} className="flex items-center gap-2">
+                                <span>+ NEW_ENTRY</span>
+                            </Button>
                         </div>
+
+                        <Input 
+                           variant="search" 
+                           placeholder="QUERY_USER_DB..." 
+                           value={searchQuery}
+                           onChange={(e) => setSearchQuery(e.target.value)}
+                           className="bg-black/20 border-hacker-border"
+                        />
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                           {filteredUsers.map(user => (
+                               <div key={user.id} onClick={() => openUserDetail(user)} className="bg-hacker-panel/20 border border-hacker-border hover:border-hacker-green/50 p-4 flex items-center gap-4 cursor-pointer group transition-all relative overflow-hidden clip-tech-border hover:bg-hacker-green/5">
+                                   <Avatar name={user.username} src={user.avatarUrl} size="md" className="shrink-0 border-hacker-border" isOnline={user.isOnline} />
+                                   <div className="flex-1 min-w-0">
+                                       <div className="flex justify-between items-center mb-1">
+                                           <div className="font-bold text-hacker-text group-hover:text-hacker-green tracking-wide">{user.username}</div>
+                                           {user.role === UserRole.ADMIN && <span className="text-[8px] bg-hacker-red/10 text-hacker-red px-1 border border-hacker-red/30">ROOT</span>}
+                                       </div>
+                                       <div className="text-[9px] text-hacker-muted font-mono">{user.id}</div>
+                                       <div className={`text-[9px] mt-2 font-bold tracking-widest ${user.isActive ? 'text-hacker-green' : 'text-hacker-red'}`}>
+                                           [{user.isActive ? 'ACTIVE' : 'TERMINATED'}]
+                                       </div>
+                                   </div>
+                               </div>
+                           ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* View: User Detail */}
+            {view === 'user-detail' && selectedUser && (
+                <div className="max-w-3xl mx-auto space-y-8 mt-4 animate-fade-in">
+                     <div className="flex items-start gap-8 border-b border-hacker-border pb-8">
+                         <div className="p-2 border border-hacker-green/50 bg-black/50 shadow-[0_0_30px_rgba(0,255,65,0.1)]">
+                            <Avatar name={selectedUser.username} src={selectedUser.avatarUrl} size="xl" />
+                         </div>
+                         <div className="flex-1 pt-2">
+                             <div className="flex items-center justify-between">
+                                 <h2 className="text-4xl font-bold text-white tracking-widest mb-2 font-mono glitch-text" data-text={selectedUser.username}>{selectedUser.username}</h2>
+                                 <div className={`px-3 py-1 border text-xs font-bold tracking-widest ${selectedUser.isOnline ? 'border-hacker-green text-hacker-green bg-hacker-green/5' : 'border-hacker-muted text-hacker-muted'}`}>
+                                     {selectedUser.isOnline ? 'ONLINE' : 'OFFLINE'}
+                                 </div>
+                             </div>
+                             <p className="text-hacker-cyan font-mono text-sm tracking-widest mb-4">ID: {selectedUser.id}</p>
+                             <div className="flex gap-4 text-[10px] text-hacker-muted font-mono uppercase">
+                                 <span>Last Seen: {new Date(selectedUser.lastSeen || 0).toLocaleString()}</span>
+                                 <span>Role: {selectedUser.role}</span>
+                             </div>
+                         </div>
                      </div>
 
-                     {/* Danger Zone */}
-                     {selectedUser.id !== currentUser.id && (
-                         <div className="space-y-2 pt-4">
-                            <label className="text-xs font-medium text-ios-gray uppercase ml-4">Security</label>
-                            <div className="bg-[#1C1C1E] rounded-xl border border-white/5 overflow-hidden">
-                                <button 
-                                    onClick={handleToggleStatus}
-                                    className="w-full p-4 text-left flex justify-between items-center active:bg-white/5 transition-colors"
-                                >
-                                    <span className="text-white">Account Status</span>
-                                    <span className={selectedUser.isActive ? "text-ios-green" : "text-ios-red"}>
-                                        {selectedUser.isActive ? "Active" : "Deactivated"}
-                                    </span>
-                                </button>
-                            </div>
-                            <div className="px-1">
-                                <p className="text-xs text-ios-gray p-2">
-                                    Deactivating a user prevents them from logging in but keeps their message history.
-                                </p>
+                     <div className="grid grid-cols-1 gap-6">
+                         <div className="border border-hacker-border bg-hacker-panel/30 p-8 relative">
+                            <div className="absolute top-0 left-0 w-20 h-0.5 bg-hacker-cyan"></div>
+                            <h3 className="text-hacker-cyan text-xs font-bold uppercase mb-6 tracking-[0.2em]">PERMISSION_LEVEL</h3>
+                            <div className="flex gap-4">
+                                {[UserRole.MEMBER, UserRole.ADMIN].map(role => (
+                                    <button 
+                                        key={role}
+                                        onClick={() => setFormData({...formData, role})}
+                                        disabled={selectedUser.id === currentUser.id}
+                                        className={`flex-1 py-4 border text-xs font-bold transition-all relative group overflow-hidden ${
+                                            formData.role === role 
+                                            ? 'border-hacker-green bg-hacker-green/10 text-hacker-green shadow-[0_0_15px_rgba(0,255,65,0.2)]' 
+                                            : 'border-hacker-border text-hacker-muted hover:border-hacker-text bg-black/30'
+                                        }`}
+                                    >
+                                        {role}
+                                        {formData.role === role && <div className="absolute bottom-0 right-0 w-2 h-2 bg-hacker-green"></div>}
+                                    </button>
+                                ))}
                             </div>
                          </div>
-                     )}
-                 </div>
-             </div>
-          )}
 
-          {/* CREATE USER VIEW */}
-          {view === 'create' && (
-              <div className="p-4 sm:p-8 max-w-xl mx-auto">
-                 <h2 className="text-2xl font-bold text-white mb-6 text-center">New Team Member</h2>
-                 
-                 <form onSubmit={handleCreateUser} className="space-y-6">
-                     <div className="bg-[#1C1C1E] rounded-xl border border-white/5 overflow-hidden">
-                        <div className="p-1">
-                           <Input 
-                             label="Username" 
-                             className="bg-transparent border-none focus:ring-0 px-4" 
-                             placeholder="e.g. john.appleseed"
-                             value={formData.username}
-                             onChange={e => setFormData({...formData, username: e.target.value})}
-                           />
-                        </div>
-                        <div className="h-px bg-white/5 mx-4" />
-                        <div className="p-1">
-                           <Input 
-                             label="Initial Password" 
-                             className="bg-transparent border-none focus:ring-0 px-4" 
-                             placeholder="Required"
-                             value={formData.password}
-                             onChange={e => setFormData({...formData, password: e.target.value})}
-                           />
-                        </div>
-                        <div className="h-px bg-white/5 mx-4" />
-                        <div className="p-4 flex justify-between items-center">
-                            <label className="text-[13px] font-medium text-ios-gray ml-1">Role</label>
-                            <div className="flex bg-black/50 p-1 rounded-lg">
-                                <button 
-                                    type="button"
-                                    onClick={() => setFormData({...formData, role: UserRole.MEMBER})}
-                                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${formData.role === UserRole.MEMBER ? 'bg-white/20 text-white' : 'text-gray-500'}`}
-                                >
-                                    Member
-                                </button>
-                                <button 
-                                    type="button"
-                                    onClick={() => setFormData({...formData, role: UserRole.ADMIN})}
-                                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${formData.role === UserRole.ADMIN ? 'bg-white/20 text-white' : 'text-gray-500'}`}
-                                >
-                                    Admin
-                                </button>
+                         <div className="border border-hacker-border bg-hacker-panel/30 p-8">
+                            <h3 className="text-hacker-cyan text-xs font-bold uppercase mb-6 tracking-[0.2em]">SECURITY_OVERRIDE</h3>
+                            <div className="flex gap-4 items-end">
+                                 <div className="flex-1">
+                                    <Input 
+                                        label="NEW_ACCESS_KEY"
+                                        placeholder="ENTER_NEW_PASSWORD"
+                                        className="font-mono bg-black/50 border-hacker-border"
+                                        value={formData.password}
+                                        onChange={(e) => setFormData({...formData, password: e.target.value})}
+                                    />
+                                 </div>
+                                <Button onClick={handleUpdateUser} className="shrink-0 h-[46px] border-hacker-green hover:bg-hacker-green hover:text-black" disabled={selectedUser.id === currentUser.id && formData.role !== selectedUser.role}>
+                                    EXECUTE_UPDATE
+                                </Button>
                             </div>
-                        </div>
+                         </div>
+
+                         {selectedUser.id !== currentUser.id && (
+                             <div className="border border-hacker-red/30 bg-hacker-red/5 p-8 relative overflow-hidden">
+                                <div className="absolute -right-4 -top-4 text-hacker-red/10 text-9xl font-bold select-none pointer-events-none">!</div>
+                                <h3 className="text-hacker-red text-xs font-bold uppercase mb-6 tracking-[0.2em]">DANGER_ZONE</h3>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-sm text-hacker-text font-bold block mb-1">REVOKE_ACCESS_RIGHTS</span>
+                                        <span className="text-[10px] text-hacker-muted block">Disable login capabilities for this unit.</span>
+                                    </div>
+                                    <Button 
+                                        variant="danger" 
+                                        onClick={handleToggleStatus}
+                                        className="border border-hacker-red text-hacker-red hover:bg-hacker-red hover:text-white"
+                                    >
+                                        {selectedUser.isActive ? 'DEACTIVATE_UNIT' : 'REACTIVATE_UNIT'}
+                                    </Button>
+                                </div>
+                             </div>
+                         )}
                      </div>
+                </div>
+            )}
 
-                     {error && <div className="text-ios-red text-center text-sm bg-ios-red/10 p-2 rounded-lg">{error}</div>}
+            {/* View: Create User */}
+            {view === 'create' && (
+                  <div className="max-w-xl mx-auto mt-10">
+                     <div className="border border-hacker-green/50 bg-black/80 p-10 relative shadow-[0_0_40px_rgba(0,255,65,0.05)] clip-tech-border">
+                         <div className="absolute top-0 left-0 bg-hacker-green text-black text-[10px] font-bold px-4 py-1 tracking-widest">NEW_OPERATIVE_PROTOCOL</div>
+                         
+                         <form onSubmit={handleCreateUser} className="space-y-8 mt-4">
+                             <Input 
+                                 label="DESIGNATION" 
+                                 placeholder="USERNAME"
+                                 value={formData.username}
+                                 onChange={e => setFormData({...formData, username: e.target.value})}
+                                 className="bg-black/50 border-hacker-border"
+                             />
+                             
+                             <Input 
+                                 label="ACCESS_KEY" 
+                                 placeholder="PASSWORD"
+                                 value={formData.password}
+                                 onChange={e => setFormData({...formData, password: e.target.value})}
+                                 className="bg-black/50 border-hacker-border"
+                             />
+                             
+                             <div className="space-y-3">
+                                 <label className="text-[11px] font-bold text-hacker-green uppercase tracking-widest pl-1">{`> CLEARANCE_LEVEL`}</label>
+                                 <div className="flex gap-4">
+                                    <button 
+                                        type="button"
+                                        onClick={() => setFormData({...formData, role: UserRole.MEMBER})}
+                                        className={`flex-1 py-3 border text-xs font-bold tracking-widest transition-all ${formData.role === UserRole.MEMBER ? 'bg-hacker-cyan/10 border-hacker-cyan text-hacker-cyan shadow-[0_0_10px_rgba(0,243,255,0.2)]' : 'border-hacker-border text-hacker-muted bg-black/30'}`}
+                                    >
+                                        STANDARD
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setFormData({...formData, role: UserRole.ADMIN})}
+                                        className={`flex-1 py-3 border text-xs font-bold tracking-widest transition-all ${formData.role === UserRole.ADMIN ? 'bg-hacker-red/10 border-hacker-red text-hacker-red shadow-[0_0_10px_rgba(255,0,60,0.2)]' : 'border-hacker-border text-hacker-muted bg-black/30'}`}
+                                    >
+                                        ADMIN
+                                    </button>
+                                 </div>
+                             </div>
 
-                     <Button type="submit" className="w-full bg-ios-blue py-3 text-[17px]">
-                        Create Account
-                     </Button>
-                 </form>
-              </div>
-          )}
+                             {error && <div className="text-hacker-red text-center text-xs font-bold border border-hacker-red p-3 bg-hacker-red/5 animate-pulse">{error}</div>}
 
+                             <Button type="submit" className="w-full mt-6 h-12 text-sm tracking-[0.2em] shadow-[0_0_20px_rgba(0,255,65,0.1)]">
+                                INITIATE_CREATION
+                             </Button>
+                         </form>
+                     </div>
+                  </div>
+            )}
+        </div>
+
+        {/* Footer */}
+         <div className="h-8 border-t border-hacker-border bg-black/80 flex items-center justify-between px-6 text-[9px] text-hacker-muted font-mono uppercase shrink-0">
+             <div className="flex gap-6">
+                 <span>CPU_LOAD: {Math.floor(Math.random() * 30 + 20)}%</span>
+                 <span>MEM_ALLOC: 1024MB</span>
+             </div>
+             <div className="flex gap-2 items-center">
+                 <span className="w-1.5 h-1.5 bg-hacker-green/50 animate-pulse rounded-full"></span>
+                 <span>SYSTEM_INTEGRITY: 100%</span>
+             </div>
         </div>
       </div>
     </div>

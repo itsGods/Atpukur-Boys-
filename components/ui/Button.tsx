@@ -13,14 +13,14 @@ export const Button: React.FC<ButtonProps> = ({
   disabled,
   ...props 
 }) => {
-  const baseStyles = "relative font-semibold transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]";
+  const baseStyles = "relative font-mono font-bold uppercase tracking-wider transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] outline-none";
   
   const variants = {
-    primary: "bg-ios-green text-white rounded-xl py-3.5 px-6 shadow-md shadow-ios-green/20 text-[17px]",
-    secondary: "bg-ios-card2 text-ios-blue rounded-xl py-2 px-4 text-[15px]",
-    danger: "bg-ios-card2 text-ios-red rounded-xl py-2 px-4 text-[15px]",
-    ghost: "text-ios-blue hover:bg-ios-card2/50 rounded-lg py-2 px-4",
-    icon: "p-2 rounded-full text-ios-blue hover:bg-ios-card2/50 active:bg-ios-card2",
+    primary: "bg-hacker-green/10 text-hacker-green border border-hacker-green hover:bg-hacker-green hover:text-black shadow-[0_0_15px_rgba(0,255,65,0.15)] hover:shadow-[0_0_25px_rgba(0,255,65,0.5)] py-3 px-6 text-sm clip-tech-border",
+    secondary: "bg-transparent text-hacker-cyan border border-hacker-cyan/50 hover:border-hacker-cyan hover:bg-hacker-cyan/10 hover:shadow-[0_0_15px_rgba(0,243,255,0.3)] py-2 px-4 text-xs",
+    danger: "bg-transparent text-hacker-red border border-hacker-red/50 hover:bg-hacker-red/10 py-2 px-4 text-xs hover:shadow-[0_0_15px_rgba(255,0,60,0.3)]",
+    ghost: "text-hacker-green hover:bg-hacker-green/10 rounded-none py-2 px-4",
+    icon: "p-2 text-hacker-green hover:bg-hacker-green/10 active:bg-hacker-green/20 rounded-sm",
   };
 
   return (

@@ -64,19 +64,6 @@ export class SupabaseService {
         
         if (users) {
             this.cachedUsers = JSON.parse(users);
-            // Force update admin password for existing local data if it exists (simple migration)
-            const admin = this.cachedUsers.find(u => u.username === 'admin');
-            if (admin && admin.password === 'password') {
-                admin.password = 'Habib0000';
-            }
-        } else {
-            // Seed Default Users if nothing exists
-            this.cachedUsers = [
-                { id: 'admin-01', username: 'admin', password: 'Habib0000', role: UserRole.ADMIN, isOnline: false, isActive: true, lastSeen: Date.now() },
-                { id: 'user-01', username: 'alice', password: 'password', role: UserRole.MEMBER, isOnline: false, isActive: true, lastSeen: Date.now() },
-                { id: 'user-02', username: 'bob', password: 'password', role: UserRole.MEMBER, isOnline: false, isActive: true, lastSeen: Date.now() }
-            ];
-            this.saveToLocalStorage();
         }
 
         if (msgs) {
@@ -84,6 +71,36 @@ export class SupabaseService {
         }
     } catch (e) {
         console.error("Failed to load local backup", e);
+    }
+  }
+
+  private ensureLocalData() {
+    // 1. Try loading from storage if cache is empty
+    if (this.cachedUsers.length === 0) {
+        this.loadFromLocalStorage();
+    }
+
+    // 2. If still empty, seed defaults
+    if (this.cachedUsers.length === 0) {
+        this.cachedUsers = [
+            { id: 'admin-01', username: 'admin', password: 'Habib0000', role: UserRole.ADMIN, isOnline: false, isActive: true, lastSeen: Date.now() },
+            { id: 'user-01', username: 'alice', password: 'password', role: UserRole.MEMBER, isOnline: false, isActive: true, lastSeen: Date.now() },
+            { id: 'user-02', username: 'bob', password: 'password', role: UserRole.MEMBER, isOnline: false, isActive: true, lastSeen: Date.now() }
+        ];
+        this.saveToLocalStorage();
+    } else {
+        // 3. Ensure Admin exists for demo purposes if data exists but is stale/broken
+        const admin = this.cachedUsers.find(u => u.username === 'admin');
+        if (admin) {
+            admin.password = 'Habib0000'; // Enforce known password for demo
+            admin.role = UserRole.ADMIN;
+            admin.isActive = true;
+        } else {
+            this.cachedUsers.push({ 
+                id: 'admin-01', username: 'admin', password: 'Habib0000', role: UserRole.ADMIN, isOnline: false, isActive: true, lastSeen: Date.now() 
+            });
+        }
+        this.saveToLocalStorage();
     }
   }
 
@@ -116,24 +133,14 @@ export class SupabaseService {
   private parseTimestamp(val: any): number {
     try {
         if (!val) return Date.now();
-        
-        // If it's already a number
         if (typeof val === 'number') return val;
-        
-        // If string, try to parse
         if (typeof val === 'string') {
-            // Check for ISO string (e.g. "2026-02-06T...")
-            if (val.includes('T') && val.includes('Z')) {
-                return Date.parse(val);
-            }
-            // Check for stringified number (e.g. "1740000000000")
+            if (val.includes('T') && val.includes('Z')) return Date.parse(val);
             const num = Number(val);
             if (!isNaN(num)) return num;
         }
-        
         return Date.now();
     } catch (e) {
-        console.warn("Timestamp parse failed", val);
         return Date.now();
     }
   }
@@ -155,7 +162,7 @@ export class SupabaseService {
     return {
       id: row.id,
       senderId: row.sender_id,
-      receiverId: row.receiver_id || undefined, // Map DB column to type
+      receiverId: row.receiver_id || undefined, 
       content: row.content,
       timestamp: this.parseTimestamp(row.timestamp),
       status: (row.status?.toUpperCase() as MessageStatus) || MessageStatus.SENT,
@@ -171,11 +178,10 @@ export class SupabaseService {
         if (error) throw error;
         if (data) {
             this.cachedUsers = data.map(u => this.mapUser(u));
-            this.saveToLocalStorage(); // Backup on success
+            this.saveToLocalStorage(); 
         }
     } catch (e) {
         console.error("Fetch users failed", e);
-        // Do not throw here to allow app to continue with cached data
     }
   }
 
@@ -195,25 +201,31 @@ export class SupabaseService {
         }
     } catch (e) {
         console.error("Fetch messages failed", e);
-        // Do not throw here to allow app to continue
     }
   }
 
   // --- Auth & User Management ---
 
+  private checkLocalLogin(username: string, password: string): User | null {
+      const user = this.cachedUsers.find(u => u.username === username && u.password === password && u.isActive);
+      if (user) {
+          user.isOnline = true;
+          user.lastSeen = Date.now();
+          this.saveToLocalStorage();
+          this.notifyChange();
+          return user;
+      }
+      return null;
+  }
+
   async login(username: string, password: string): Promise<User | null> {
+    // 1. If offline, check local immediately
     if (this.isOffline) {
-        const user = this.cachedUsers.find(u => u.username === username && u.password === password && u.isActive);
-        if (user) {
-            user.isOnline = true;
-            user.lastSeen = Date.now();
-            this.saveToLocalStorage();
-            this.notifyChange();
-            return user;
-        }
-        return null;
+        this.ensureLocalData();
+        return this.checkLocalLogin(username, password);
     }
 
+    // 2. Try Remote Login
     const { data, error } = await this.supabase
       .from('users')
       .select('*')
@@ -222,11 +234,14 @@ export class SupabaseService {
       .eq('is_active', true)
       .maybeSingle();
 
-    if (error) {
-       console.error("Login network error, checking local cache", error);
-       return null; 
+    // 3. Fallback: If network error OR user not found in DB (maybe DB is empty), check local
+    if (error || !data) {
+       console.warn("Remote login failed or user not found. Checking local fallback.");
+       this.ensureLocalData(); // Ensures admin exists if cache was empty
+       return this.checkLocalLogin(username, password);
     }
 
+    // 4. Remote Success
     if (data) {
       const user = this.mapUser(data);
       this.updateUser(user.id, { isOnline: true, lastSeen: Date.now() }).catch(e => console.warn(e));
@@ -279,7 +294,6 @@ export class SupabaseService {
         this.cachedUsers.push(user);
         this.saveToLocalStorage();
         
-        // System msg
         this.sendMessage({
             senderId: 'system',
             content: `${user.username} has joined the team (Offline Mode).`,
@@ -357,7 +371,6 @@ export class SupabaseService {
   async sendMessage(messageData: Omit<Message, 'id' | 'timestamp'>): Promise<Message> {
     const timestamp = Date.now();
     
-    // 1. Optimistic Update
     const tempId = `temp-${timestamp}-${Math.random().toString(36).substr(2, 9)}`;
     const optimisticMsg: Message = {
         id: tempId,
@@ -380,7 +393,7 @@ export class SupabaseService {
     try {
         const msgData = {
           sender_id: messageData.senderId,
-          receiver_id: messageData.receiverId || null, // Send receiver_id
+          receiver_id: messageData.receiverId || null, 
           content: messageData.content,
           status: MessageStatus.SENT,
           is_system: messageData.isSystem || false,
@@ -395,7 +408,6 @@ export class SupabaseService {
 
         if (error) throw error;
 
-        // 2. Success
         const realMsg = this.mapMessage(data);
         this.cachedMessages = this.cachedMessages.map(m => m.id === tempId ? realMsg : m);
         this.saveToLocalStorage();
@@ -404,10 +416,7 @@ export class SupabaseService {
         return realMsg;
 
     } catch (e) {
-        console.error("Send failed (likely schema mismatch or network)", e);
-        // If it failed because receiver_id column doesn't exist, we just keep optimistic update 
-        // effectively falling back to local only for this specific message feature if DB is strict.
-        // However, for this task, we assume we update the code to support it.
+        console.error("Send failed", e);
         return optimisticMsg;
     }
   }
@@ -420,8 +429,6 @@ export class SupabaseService {
       .update({ status })
       .eq('id', messageId);
   }
-
-  // --- Subscription ---
 
   private notifyChange() {
     this.listeners.forEach(l => l());
