@@ -41,12 +41,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
     e.preventDefault();
     setError('');
     try {
-      if (!formData.username || !formData.password) throw new Error("CREDENTIALS_MISSING");
+      if (!formData.username || !formData.password) throw new Error("Missing username or password");
       await mockService.createUser(formData);
       setFormData({ username: '', password: '', role: UserRole.MEMBER });
       setView('dashboard');
       loadData();
-      showSuccess("UNIT_INITIALIZED");
+      showSuccess("User created successfully");
     } catch (err: any) {
       setError(err.message);
     }
@@ -60,7 +60,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
       
       await mockService.updateUser(selectedUser.id, updates);
       loadData();
-      showSuccess("DB_RECORD_UPDATED");
+      showSuccess("User updated successfully");
     } catch (err: any) {
       setError(err.message);
     }
@@ -79,12 +79,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
     
     await mockService.sendMessage({
       senderId: 'system',
-      content: `SYSTEM_BROADCAST:\n\n${broadcastText}`,
+      content: `ANNOUNCEMENT:\n\n${broadcastText}`,
       isSystem: true,
       status: MessageStatus.SENT
     });
     setBroadcastText('');
-    showSuccess("PACKET_SENT_ALL");
+    showSuccess("Announcement sent");
   };
 
   const showSuccess = (msg: string) => {
@@ -116,13 +116,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
             {/* Title Block */}
             <div className="flex items-center gap-4">
                  <div className="w-8 h-8 border border-hacker-green flex items-center justify-center bg-hacker-green/10 animate-pulse">
-                    <svg className="w-5 h-5 text-hacker-green" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    <svg className="w-5 h-5 text-hacker-green" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                  </div>
                  <div>
-                     <h2 className="text-xl font-bold text-white tracking-[0.15em] glitch-text" data-text="ROOT_ACCESS_TERMINAL">ROOT_ACCESS_TERMINAL</h2>
+                     <h2 className="text-xl font-bold text-white tracking-[0.15em] glitch-text" data-text="ADMIN DASHBOARD">ADMIN DASHBOARD</h2>
                      <div className="flex items-center gap-2">
                          <div className="w-1.5 h-1.5 bg-hacker-green animate-pulse rounded-full"></div>
-                         <span className="text-[10px] text-hacker-green tracking-widest uppercase">Secure Connection</span>
+                         <span className="text-[10px] text-hacker-green tracking-widest uppercase">Secure</span>
                          {successMsg && <span className="ml-4 text-[10px] text-hacker-green bg-hacker-green/10 border border-hacker-green px-2 py-0.5 animate-pulse">{`>>`} {successMsg}</span>}
                      </div>
                  </div>
@@ -132,12 +132,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
             <div className="flex items-center gap-6">
                 {view !== 'dashboard' && (
                     <button onClick={() => setView('dashboard')} className="text-hacker-cyan text-xs font-bold tracking-widest hover:text-white transition-colors flex items-center gap-2 group border border-transparent hover:border-hacker-cyan/30 px-3 py-1">
-                        <span>&lt; RETURN_TO_DASHBOARD</span>
+                        <span>&lt; Back</span>
                     </button>
                 )}
                 <div className="h-8 w-px bg-hacker-border hidden sm:block"></div>
                 <button onClick={onClose} className="text-hacker-red text-xs font-bold tracking-widest hover:text-white transition-colors flex items-center gap-2 group border border-hacker-red/30 hover:bg-hacker-red/10 px-3 py-1">
-                    <span>[ TERMINATE_SESSION ]</span>
+                    <span>[ Close ]</span>
                 </button>
             </div>
         </div>
@@ -152,16 +152,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
                     {/* Stats Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {[
-                            { label: 'REGISTERED_UNITS', val: stats.users, color: 'text-white' },
-                            { label: 'ACTIVE_LINKS', val: stats.online, color: 'text-hacker-green' },
-                            { label: 'DATA_PACKETS', val: stats.messages, color: 'text-hacker-cyan' }
+                            { label: 'Total Users', val: stats.users, color: 'text-white' },
+                            { label: 'Online Users', val: stats.online, color: 'text-hacker-green' },
+                            { label: 'Total Messages', val: stats.messages, color: 'text-hacker-cyan' }
                         ].map((stat, i) => (
                             <div key={i} className="bg-hacker-panel/40 border border-hacker-border p-6 relative group overflow-hidden">
                                 {/* Hover Effect */}
                                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-hacker-green/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
                                 
                                 <div className="flex justify-between items-start mb-4">
-                                    <span className="text-[10px] text-hacker-muted tracking-[0.2em] font-bold">{stat.label}</span>
+                                    <span className="text-[10px] text-hacker-muted tracking-[0.2em] font-bold uppercase">{stat.label}</span>
                                     <svg className={`w-4 h-4 ${stat.color} opacity-50`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
                                 </div>
                                 <div className={`text-5xl font-bold ${stat.color} font-mono tracking-tighter`}>{stat.val}</div>
@@ -175,19 +175,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
 
                     {/* Broadcast Module */}
                     <div className="border border-hacker-border bg-black/40 p-1 relative">
-                        <div className="absolute top-0 left-0 bg-hacker-green text-black text-[9px] font-bold px-3 py-0.5 tracking-widest">BROADCAST_MODULE_V2</div>
+                        <div className="absolute top-0 left-0 bg-hacker-green text-black text-[9px] font-bold px-3 py-0.5 tracking-widest">ANNOUNCEMENT</div>
                         <div className="p-6 pt-8 flex gap-4 items-center">
                             <div className="flex-1 bg-transparent border-b border-hacker-border focus-within:border-hacker-green transition-colors flex items-center gap-2 py-2">
                                 <span className="text-hacker-green text-sm font-bold">{`>`}</span>
                                 <input 
                                     className="bg-transparent w-full text-hacker-text placeholder-hacker-muted/50 focus:outline-none font-mono text-sm"
-                                    placeholder="ENTER_SYSTEM_ANNOUNCEMENT..."
+                                    placeholder="Type announcement..."
                                     value={broadcastText}
                                     onChange={(e) => setBroadcastText(e.target.value)}
                                 />
                             </div>
                             <Button onClick={handleBroadcast} disabled={!broadcastText} className="shrink-0 h-10 px-8 text-xs border-hacker-green/50 hover:bg-hacker-green/10">
-                                TRANSMIT
+                                Send
                             </Button>
                         </div>
                     </div>
@@ -195,15 +195,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
                     {/* User Database */}
                     <div className="space-y-6">
                         <div className="flex justify-between items-end border-b border-hacker-border pb-4">
-                            <h3 className="text-xl font-bold text-white tracking-[0.2em] glitch-text" data-text="DATABASE_ENTRIES">DATABASE_ENTRIES</h3>
+                            <h3 className="text-xl font-bold text-white tracking-[0.2em] glitch-text" data-text="USERS">USERS</h3>
                             <Button variant="secondary" onClick={() => { setFormData({username: '', password: '', role: UserRole.MEMBER}); setView('create'); }} className="flex items-center gap-2">
-                                <span>+ NEW_ENTRY</span>
+                                <span>+ Add User</span>
                             </Button>
                         </div>
 
                         <Input 
                            variant="search" 
-                           placeholder="QUERY_USER_DB..." 
+                           placeholder="Search users..." 
                            value={searchQuery}
                            onChange={(e) => setSearchQuery(e.target.value)}
                            className="bg-black/20 border-hacker-border"
@@ -216,11 +216,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
                                    <div className="flex-1 min-w-0">
                                        <div className="flex justify-between items-center mb-1">
                                            <div className="font-bold text-hacker-text group-hover:text-hacker-green tracking-wide">{user.username}</div>
-                                           {user.role === UserRole.ADMIN && <span className="text-[8px] bg-hacker-red/10 text-hacker-red px-1 border border-hacker-red/30">ROOT</span>}
+                                           {user.role === UserRole.ADMIN && <span className="text-[8px] bg-hacker-red/10 text-hacker-red px-1 border border-hacker-red/30">ADMIN</span>}
                                        </div>
                                        <div className="text-[9px] text-hacker-muted font-mono">{user.id}</div>
                                        <div className={`text-[9px] mt-2 font-bold tracking-widest ${user.isActive ? 'text-hacker-green' : 'text-hacker-red'}`}>
-                                           [{user.isActive ? 'ACTIVE' : 'TERMINATED'}]
+                                           [{user.isActive ? 'Active' : 'Blocked'}]
                                        </div>
                                    </div>
                                </div>
@@ -241,7 +241,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
                              <div className="flex items-center justify-between">
                                  <h2 className="text-4xl font-bold text-white tracking-widest mb-2 font-mono glitch-text" data-text={selectedUser.username}>{selectedUser.username}</h2>
                                  <div className={`px-3 py-1 border text-xs font-bold tracking-widest ${selectedUser.isOnline ? 'border-hacker-green text-hacker-green bg-hacker-green/5' : 'border-hacker-muted text-hacker-muted'}`}>
-                                     {selectedUser.isOnline ? 'ONLINE' : 'OFFLINE'}
+                                     {selectedUser.isOnline ? 'Online' : 'Offline'}
                                  </div>
                              </div>
                              <p className="text-hacker-cyan font-mono text-sm tracking-widest mb-4">ID: {selectedUser.id}</p>
@@ -255,7 +255,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
                      <div className="grid grid-cols-1 gap-6">
                          <div className="border border-hacker-border bg-hacker-panel/30 p-8 relative">
                             <div className="absolute top-0 left-0 w-20 h-0.5 bg-hacker-cyan"></div>
-                            <h3 className="text-hacker-cyan text-xs font-bold uppercase mb-6 tracking-[0.2em]">PERMISSION_LEVEL</h3>
+                            <h3 className="text-hacker-cyan text-xs font-bold uppercase mb-6 tracking-[0.2em]">User Role</h3>
                             <div className="flex gap-4">
                                 {[UserRole.MEMBER, UserRole.ADMIN].map(role => (
                                     <button 
@@ -268,7 +268,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
                                             : 'border-hacker-border text-hacker-muted hover:border-hacker-text bg-black/30'
                                         }`}
                                     >
-                                        {role}
+                                        {role === UserRole.MEMBER ? 'Standard' : 'Admin'}
                                         {formData.role === role && <div className="absolute bottom-0 right-0 w-2 h-2 bg-hacker-green"></div>}
                                     </button>
                                 ))}
@@ -276,19 +276,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
                          </div>
 
                          <div className="border border-hacker-border bg-hacker-panel/30 p-8">
-                            <h3 className="text-hacker-cyan text-xs font-bold uppercase mb-6 tracking-[0.2em]">SECURITY_OVERRIDE</h3>
+                            <h3 className="text-hacker-cyan text-xs font-bold uppercase mb-6 tracking-[0.2em]">Reset Password</h3>
                             <div className="flex gap-4 items-end">
                                  <div className="flex-1">
                                     <Input 
-                                        label="NEW_ACCESS_KEY"
-                                        placeholder="ENTER_NEW_PASSWORD"
+                                        label="New Password"
+                                        placeholder="Enter new password"
                                         className="font-mono bg-black/50 border-hacker-border"
                                         value={formData.password}
                                         onChange={(e) => setFormData({...formData, password: e.target.value})}
                                     />
                                  </div>
                                 <Button onClick={handleUpdateUser} className="shrink-0 h-[46px] border-hacker-green hover:bg-hacker-green hover:text-black" disabled={selectedUser.id === currentUser.id && formData.role !== selectedUser.role}>
-                                    EXECUTE_UPDATE
+                                    Update
                                 </Button>
                             </div>
                          </div>
@@ -296,18 +296,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
                          {selectedUser.id !== currentUser.id && (
                              <div className="border border-hacker-red/30 bg-hacker-red/5 p-8 relative overflow-hidden">
                                 <div className="absolute -right-4 -top-4 text-hacker-red/10 text-9xl font-bold select-none pointer-events-none">!</div>
-                                <h3 className="text-hacker-red text-xs font-bold uppercase mb-6 tracking-[0.2em]">DANGER_ZONE</h3>
+                                <h3 className="text-hacker-red text-xs font-bold uppercase mb-6 tracking-[0.2em]">Account Status</h3>
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <span className="text-sm text-hacker-text font-bold block mb-1">REVOKE_ACCESS_RIGHTS</span>
-                                        <span className="text-[10px] text-hacker-muted block">Disable login capabilities for this unit.</span>
+                                        <span className="text-sm text-hacker-text font-bold block mb-1">Block User</span>
+                                        <span className="text-[10px] text-hacker-muted block">Prevent user from logging in.</span>
                                     </div>
                                     <Button 
                                         variant="danger" 
                                         onClick={handleToggleStatus}
                                         className="border border-hacker-red text-hacker-red hover:bg-hacker-red hover:text-white"
                                     >
-                                        {selectedUser.isActive ? 'DEACTIVATE_UNIT' : 'REACTIVATE_UNIT'}
+                                        {selectedUser.isActive ? 'Block' : 'Unblock'}
                                     </Button>
                                 </div>
                              </div>
@@ -320,41 +320,41 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
             {view === 'create' && (
                   <div className="max-w-xl mx-auto mt-10">
                      <div className="border border-hacker-green/50 bg-black/80 p-10 relative shadow-[0_0_40px_rgba(0,255,65,0.05)] clip-tech-border">
-                         <div className="absolute top-0 left-0 bg-hacker-green text-black text-[10px] font-bold px-4 py-1 tracking-widest">NEW_OPERATIVE_PROTOCOL</div>
+                         <div className="absolute top-0 left-0 bg-hacker-green text-black text-[10px] font-bold px-4 py-1 tracking-widest">Create New User</div>
                          
                          <form onSubmit={handleCreateUser} className="space-y-8 mt-4">
                              <Input 
-                                 label="DESIGNATION" 
-                                 placeholder="USERNAME"
+                                 label="Username" 
+                                 placeholder="Username"
                                  value={formData.username}
                                  onChange={e => setFormData({...formData, username: e.target.value})}
                                  className="bg-black/50 border-hacker-border"
                              />
                              
                              <Input 
-                                 label="ACCESS_KEY" 
-                                 placeholder="PASSWORD"
+                                 label="Password" 
+                                 placeholder="Password"
                                  value={formData.password}
                                  onChange={e => setFormData({...formData, password: e.target.value})}
                                  className="bg-black/50 border-hacker-border"
                              />
                              
                              <div className="space-y-3">
-                                 <label className="text-[11px] font-bold text-hacker-green uppercase tracking-widest pl-1">{`> CLEARANCE_LEVEL`}</label>
+                                 <label className="text-[11px] font-bold text-hacker-green uppercase tracking-widest pl-1">{`> Role`}</label>
                                  <div className="flex gap-4">
                                     <button 
                                         type="button"
                                         onClick={() => setFormData({...formData, role: UserRole.MEMBER})}
                                         className={`flex-1 py-3 border text-xs font-bold tracking-widest transition-all ${formData.role === UserRole.MEMBER ? 'bg-hacker-cyan/10 border-hacker-cyan text-hacker-cyan shadow-[0_0_10px_rgba(0,243,255,0.2)]' : 'border-hacker-border text-hacker-muted bg-black/30'}`}
                                     >
-                                        STANDARD
+                                        Standard
                                     </button>
                                     <button 
                                         type="button"
                                         onClick={() => setFormData({...formData, role: UserRole.ADMIN})}
                                         className={`flex-1 py-3 border text-xs font-bold tracking-widest transition-all ${formData.role === UserRole.ADMIN ? 'bg-hacker-red/10 border-hacker-red text-hacker-red shadow-[0_0_10px_rgba(255,0,60,0.2)]' : 'border-hacker-border text-hacker-muted bg-black/30'}`}
                                     >
-                                        ADMIN
+                                        Admin
                                     </button>
                                  </div>
                              </div>
@@ -362,7 +362,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
                              {error && <div className="text-hacker-red text-center text-xs font-bold border border-hacker-red p-3 bg-hacker-red/5 animate-pulse">{error}</div>}
 
                              <Button type="submit" className="w-full mt-6 h-12 text-sm tracking-[0.2em] shadow-[0_0_20px_rgba(0,255,65,0.1)]">
-                                INITIATE_CREATION
+                                Create User
                              </Button>
                          </form>
                      </div>
@@ -373,12 +373,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) 
         {/* Footer */}
          <div className="h-8 border-t border-hacker-border bg-black/80 flex items-center justify-between px-6 text-[9px] text-hacker-muted font-mono uppercase shrink-0">
              <div className="flex gap-6">
-                 <span>CPU_LOAD: {Math.floor(Math.random() * 30 + 20)}%</span>
-                 <span>MEM_ALLOC: 1024MB</span>
+                 <span>CPU: {Math.floor(Math.random() * 30 + 20)}%</span>
+                 <span>RAM: 1024MB</span>
              </div>
              <div className="flex gap-2 items-center">
                  <span className="w-1.5 h-1.5 bg-hacker-green/50 animate-pulse rounded-full"></span>
-                 <span>SYSTEM_INTEGRITY: 100%</span>
+                 <span>System: 100%</span>
              </div>
         </div>
       </div>

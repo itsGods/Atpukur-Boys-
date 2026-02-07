@@ -210,7 +210,7 @@ export class SupabaseService {
       password: row.password, 
       role: (row.role?.toUpperCase() as UserRole) || UserRole.MEMBER,
       isOnline: row.is_online,
-      avatarUrl: row.avatar_url,
+      avatarUrl: row.avatar_url, // This will now typically be null/undefined for new users
       lastSeen: this.parseTimestamp(row.last_seen),
       isActive: row.is_active
     };
@@ -339,13 +339,13 @@ export class SupabaseService {
     }
 
     const tempId = `user-${Date.now()}`;
+    // NOTE: Removed avatar_url generation to enforce "no photo" DP policy
     const userData = {
       username: newUser.username,
       password: newUser.password,
       role: newUser.role || UserRole.MEMBER,
       is_online: false,
       is_active: true,
-      avatar_url: `https://ui-avatars.com/api/?name=${newUser.username}&background=random`,
       last_seen: Date.now()
     };
 
@@ -366,8 +366,6 @@ export class SupabaseService {
         return user;
     }
 
-    // Explicitly add 'id' with tempId to allow creation, supabase will usually ignore if serial/uuid default, 
-    // but here we are using text ID for users
     const userPayload = { ...userData, id: tempId };
 
     const { data, error } = await this.supabase
@@ -377,7 +375,6 @@ export class SupabaseService {
       .single();
 
     if (error || !data) {
-        // Fallback for demo if DB insert fails (e.g., duplicate ID collision on random generation)
         console.error("User creation error", error);
         throw new Error(error?.message || "Failed to create user");
     }
@@ -420,12 +417,20 @@ export class SupabaseService {
       .update(dbUpdates)
       .eq('id', userId)
       .select()
-      .single();
+      .maybeSingle();
 
-    if (error || !data) throw new Error(error?.message || "Failed to update user");
+    if (error) throw new Error(error.message || "Failed to update user");
+    // If no data returned (row deleted etc), handle gracefully or throw. 
+    // For now, if no data, we can't return a User object properly if we rely on the DB return.
+    // But mapUser needs 'row'. If data is null, we can't map.
+    if (!data) {
+        // Fallback to finding in cache or throwing if strict. 
+        // For logout, we might ignore. For explicit update, we might want to know.
+        // Let's return the local version modified if remote fails to return?
+        // Or better, just throw "User not found"
+        throw new Error("User not found or update failed");
+    }
     
-    // We do NOT need to manually update cachedUsers here, because subscribeToRealtime will catch the UPDATE event
-    // However, for immediate local responsiveness, we can:
     const updated = this.mapUser(data);
     // IMMUTABLE UPDATE
     this.cachedUsers = this.cachedUsers.map(u => u.id === updated.id ? updated : u);
@@ -482,9 +487,6 @@ export class SupabaseService {
 
         if (error) throw error;
 
-        // The realtime subscription will eventually see this insert.
-        // But to ensure we don't have a flash of duplicate/missing content, 
-        // we manually replace the optimistic message with the confirmed one now.
         const realMsg = this.mapMessage(data);
         // IMMUTABLE UPDATE
         this.cachedMessages = this.cachedMessages.map(m => m.id === tempId ? realMsg : m);
@@ -495,8 +497,6 @@ export class SupabaseService {
 
     } catch (e) {
         console.error("Send failed", e);
-        // Keep optimistic message but mark as potential error state? 
-        // For now, we leave it as 'SENT' locally.
         return optimisticMsg;
     }
   }
