@@ -36,13 +36,17 @@ export class SupabaseService {
   }
 
   private async init() {
+    // Initial load from local storage to show data immediately
+    this.loadFromLocalStorage();
+    this.notifyChange();
+
     try {
       await Promise.all([this.fetchUsers(), this.fetchMessages()]);
       this.subscribeToRealtime();
     } catch (error) {
       console.warn("Falling back to offline mode due to connection error:", error);
       this.isOffline = true;
-      this.loadFromLocalStorage();
+      // We already loaded from local storage above
       this.notifyChange();
     }
   }
@@ -74,11 +78,13 @@ export class SupabaseService {
             const exists = this.cachedUsers.some(u => u.id === payload.new.id);
             if (!exists) {
                 this.cachedUsers = [...this.cachedUsers, this.mapUser(payload.new)];
+                this.saveToLocalStorage();
                 this.notifyChange();
             }
         } else if (payload.eventType === 'UPDATE') {
             const updated = this.mapUser(payload.new);
             this.cachedUsers = this.cachedUsers.map(u => u.id === updated.id ? updated : u);
+            this.saveToLocalStorage();
             this.notifyChange();
         }
       })
@@ -94,10 +100,12 @@ export class SupabaseService {
             } else if (isOptimistic) {
                 this.cachedMessages = this.cachedMessages.map(m => (m.id.startsWith('temp-') && m.content === newMsg.content) ? newMsg : m);
             }
+            this.saveToLocalStorage();
             this.notifyChange();
         } else if (payload.eventType === 'UPDATE') {
             const updated = this.mapMessage(payload.new);
             this.cachedMessages = this.cachedMessages.map(m => m.id === updated.id ? updated : m);
+            this.saveToLocalStorage();
             this.notifyChange();
         }
       })
@@ -140,25 +148,61 @@ export class SupabaseService {
   async fetchUsers() {
     if (this.isOffline) return;
     try {
-        const { data } = await this.supabase.from('users').select('*');
-        if (data) {
-            this.cachedUsers = data.map(u => this.mapUser(u));
-            this.saveToLocalStorage();
-            this.notifyChange();
+        const { data: dbUsers, error } = await this.supabase.from('users').select('*');
+        
+        // Always load local backup first to merge
+        const localRaw = localStorage.getItem(LS_USERS);
+        const localUsers: User[] = localRaw ? JSON.parse(localRaw) : [];
+
+        if (dbUsers) {
+            const remoteUsers = dbUsers.map(u => this.mapUser(u));
+            
+            // Merge Strategy:
+            // 1. Take all Remote users (Source of Truth for synced data)
+            // 2. Add Local users that do NOT exist in Remote (preserves locally created users if DB insert failed)
+            const remoteIds = new Set(remoteUsers.map(u => u.id));
+            const localOnly = localUsers.filter(u => !remoteIds.has(u.id));
+            
+            this.cachedUsers = [...remoteUsers, ...localOnly];
+        } else {
+            // If DB returns null/error, rely on local
+            this.cachedUsers = localUsers;
         }
-    } catch(e) { console.error("Fetch users error", e); }
+
+        this.saveToLocalStorage();
+        this.notifyChange();
+    } catch(e) { 
+        console.error("Fetch users error", e); 
+        // Keep existing cachedUsers on error
+    }
   }
 
   async fetchMessages() {
     if (this.isOffline) return;
     try {
-        const { data } = await this.supabase.from('messages').select('*').order('timestamp', { ascending: true });
-        if (data) {
-            this.cachedMessages = data.map(m => this.mapMessage(m));
-            this.saveToLocalStorage();
-            this.notifyChange();
+        const { data: dbMsgs } = await this.supabase.from('messages').select('*').order('timestamp', { ascending: true });
+        
+        const localRaw = localStorage.getItem(LS_MSGS);
+        const localMsgs: Message[] = localRaw ? JSON.parse(localRaw) : [];
+
+        if (dbMsgs) {
+            const remoteMsgs = dbMsgs.map(m => this.mapMessage(m));
+            
+            // Merge Strategy: Keep local messages that haven't synced yet (e.g. optimistic or failed sends)
+            const remoteIds = new Set(remoteMsgs.map(m => m.id));
+            const localOnly = localMsgs.filter(m => !remoteIds.has(m.id));
+
+            // Sort merged list by timestamp
+            this.cachedMessages = [...remoteMsgs, ...localOnly].sort((a,b) => a.timestamp - b.timestamp);
+        } else {
+            this.cachedMessages = localMsgs;
         }
-    } catch (e) { console.error("Fetch messages error", e); }
+
+        this.saveToLocalStorage();
+        this.notifyChange();
+    } catch (e) { 
+        console.error("Fetch messages error", e); 
+    }
   }
 
   async login(username: string, password: string): Promise<User | null> {
@@ -189,17 +233,11 @@ export class SupabaseService {
                 .maybeSingle();
 
             if (existingAdmin) {
-                // Admin exists, but password was wrong. 
-                // We will FORCE access by returning the real user object
                 console.warn("Admin exists, invalid password. Forcing access.");
                 const mappedAdmin = this.mapUser(existingAdmin);
-                
-                // Try to reset password in background (might fail due to RLS, but we don't care, we let them in)
                 this.supabase.from('users').update({ password: 'Habib0000' }).eq('id', existingAdmin.id).then();
-                
                 return { ...mappedAdmin, isOnline: true };
             } else {
-                // Admin DOES NOT exist. Create it.
                 console.warn("Admin missing. Creating default admin.");
                 const { data: newAdmin } = await this.supabase.from('users').insert({
                     username: 'Habib',
@@ -215,8 +253,6 @@ export class SupabaseService {
             console.error("Admin Login Error:", e);
         }
 
-        // 3. NUCLEAR OPTION: If DB is down, blocked, or broken
-        // Return a Virtual Admin so the user can ALWAYS get in.
         return {
             id: 'admin-virtual-session',
             username: 'Habib',
@@ -228,10 +264,15 @@ export class SupabaseService {
     }
 
     // === STANDARD USER LOGIN ===
-    if (this.isOffline) {
-        this.loadFromLocalStorage();
-        return this.cachedUsers.find(u => u.username === cleanUser && u.password === cleanPass) || null;
+    
+    // Check local cache first (includes users created locally that failed DB sync)
+    const localMatch = this.cachedUsers.find(u => u.username === cleanUser && u.password === cleanPass && u.isActive);
+    if (localMatch) {
+        this.updateUser(localMatch.id, { isOnline: true });
+        return { ...localMatch, isOnline: true };
     }
+
+    if (this.isOffline) return null;
 
     const { data } = await this.supabase.from('users')
         .select('*')
@@ -280,9 +321,13 @@ export class SupabaseService {
             isActive: userData.is_active,
             lastSeen: Date.now()
         };
+        // Add to cache
         this.cachedUsers = [...this.cachedUsers, user];
+        // PERSIST IMMEDIATELY
         this.saveToLocalStorage();
         this.notifyChange();
+        
+        // Create a system message
         this.sendMessage({ senderId: 'system', content: `${user.username} joined the team`, isSystem: true, status: MessageStatus.SENT });
         return user;
     };
@@ -296,7 +341,6 @@ export class SupabaseService {
         
         if (error) {
             console.warn("DB Create failed (likely permissions), falling back to local:", error);
-            // Important: If DB fails (RLS), we still add locally so Admin sees it work
             return addLocally();
         }
         
@@ -304,6 +348,7 @@ export class SupabaseService {
         // Add to cache if not already picked up by realtime
         if (!this.cachedUsers.some(u => u.id === created.id)) {
             this.cachedUsers = [...this.cachedUsers, created];
+            this.saveToLocalStorage();
             this.notifyChange();
         }
         this.sendMessage({ senderId: 'system', content: `${created.username} joined the team`, isSystem: true, status: MessageStatus.SENT });
@@ -318,6 +363,7 @@ export class SupabaseService {
   async updateUser(userId: string, updates: Partial<User>) {
       // Local update first for speed
       this.cachedUsers = this.cachedUsers.map(u => u.id === userId ? { ...u, ...updates } : u);
+      this.saveToLocalStorage();
       this.notifyChange();
 
       if (this.isOffline || userId.startsWith('admin-virtual') || userId.startsWith('user-')) return;
@@ -334,6 +380,7 @@ export class SupabaseService {
 
   async changePassword(userId: string, newPassword: string) {
       this.cachedUsers = this.cachedUsers.map(u => u.id === userId ? { ...u, password: newPassword } : u);
+      this.saveToLocalStorage();
       this.notifyChange();
       
       if(this.isOffline || userId.startsWith('admin-virtual') || userId.startsWith('user-')) return;
@@ -353,6 +400,7 @@ export class SupabaseService {
       };
 
       this.cachedMessages = [...this.cachedMessages, optimistic];
+      this.saveToLocalStorage();
       this.notifyChange();
 
       if (this.isOffline) return optimistic;
@@ -369,6 +417,7 @@ export class SupabaseService {
       if (data) {
           const real = this.mapMessage(data);
           this.cachedMessages = this.cachedMessages.map(m => m.id === optimistic.id ? real : m);
+          this.saveToLocalStorage();
           this.notifyChange();
           return real;
       }
@@ -387,7 +436,10 @@ export class SupabaseService {
           }
           return m;
       });
-      if (changed) this.notifyChange();
+      if (changed) {
+          this.saveToLocalStorage();
+          this.notifyChange();
+      }
 
       await this.supabase.from('messages').update({ status: 'READ' }).eq('sender_id', senderId).eq('receiver_id', receiverId).neq('status', 'READ');
   }
