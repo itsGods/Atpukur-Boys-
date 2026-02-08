@@ -40,10 +40,37 @@ export class SupabaseService {
       await Promise.all([this.fetchUsers(), this.fetchMessages()]);
       await this.syncToCloud();
       this.subscribeToRealtime();
+      this.startPolling(); // Fallback mechanism
     } catch (error) {
       console.warn("OFFLINE MODE ACTIVATED: Could not connect to Supabase", error);
       this.isOffline = true;
     }
+  }
+
+  private startPolling() {
+      // Poll every 3 seconds to guarantee delivery even if sockets fail
+      setInterval(() => {
+          if (!document.hidden) {
+              this.fetchMessages();
+          }
+      }, 3000);
+
+      // Poll users less frequently (10s)
+      setInterval(() => {
+          if (!document.hidden) {
+             this.fetchUsers();
+          }
+      }, 10000);
+
+      // Immediate refresh when tab becomes visible
+      if (typeof document !== 'undefined') {
+          document.addEventListener('visibilitychange', () => {
+              if (document.visibilityState === 'visible') {
+                  this.fetchMessages();
+                  this.fetchUsers();
+              }
+          });
+      }
   }
 
   private generateId(): string {
@@ -80,8 +107,15 @@ export class SupabaseService {
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const user = this.mapUser(payload.new);
             const idx = this.cachedUsers.findIndex(u => u.id === user.id);
-            if (idx === -1) this.cachedUsers.push(user);
-            else this.cachedUsers[idx] = user;
+            
+            // IMPORTANT: Create NEW array reference for React to detect change
+            if (idx === -1) {
+                this.cachedUsers = [...this.cachedUsers, user];
+            } else {
+                const newUsers = [...this.cachedUsers];
+                newUsers[idx] = user;
+                this.cachedUsers = newUsers;
+            }
             
             this.saveToLocalStorage();
             this.notifyChange();
@@ -89,9 +123,11 @@ export class SupabaseService {
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
           const msg = this.mapMessage(payload.new);
+          // Prevent duplicates
           if (!this.cachedMessages.some(m => m.id === msg.id)) {
-              this.cachedMessages.push(msg);
-              this.cachedMessages.sort((a,b) => a.timestamp - b.timestamp);
+              // IMPORTANT: Create NEW array reference
+              this.cachedMessages = [...this.cachedMessages, msg].sort((a,b) => a.timestamp - b.timestamp);
+              
               this.saveToLocalStorage();
               this.notifyChange();
           }
@@ -104,6 +140,8 @@ export class SupabaseService {
       .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
               console.log('REALTIME_UPLINK_ESTABLISHED');
+          } else {
+              console.log('REALTIME_STATUS:', status);
           }
       });
   }
@@ -143,9 +181,9 @@ export class SupabaseService {
     }
     if (data) {
         const remote = data.map(u => this.mapUser(u));
-        const remoteIds = new Set(remote.map(u => u.id));
-        const localOnly = this.cachedUsers.filter(u => !remoteIds.has(u.id));
-        this.cachedUsers = [...remote, ...localOnly];
+        // Use remote data as truth, but we could merge local state if needed.
+        // Simple overwrite is often safer for sync.
+        this.cachedUsers = remote;
         this.saveToLocalStorage();
         this.notifyChange();
     }
@@ -164,9 +202,18 @@ export class SupabaseService {
     }
 
     if (data) {
-        this.cachedMessages = data.reverse().map(m => this.mapMessage(m));
-        this.saveToLocalStorage();
-        this.notifyChange();
+        const remoteMessages = data.reverse().map(m => this.mapMessage(m));
+        
+        // Only update if data actually changed to avoid loop
+        // We compare basic length and last ID for efficiency
+        const isDifferent = remoteMessages.length !== this.cachedMessages.length ||
+            (remoteMessages.length > 0 && remoteMessages[remoteMessages.length - 1].id !== this.cachedMessages[this.cachedMessages.length - 1]?.id);
+
+        if (isDifferent) {
+            this.cachedMessages = remoteMessages;
+            this.saveToLocalStorage();
+            this.notifyChange();
+        }
     }
   }
 
@@ -186,12 +233,11 @@ export class SupabaseService {
           })));
           
           if (!error) {
-             localUsers.forEach(u => u.isSynced = true);
+             // Update references for local users
+             this.cachedUsers = this.cachedUsers.map(u => 
+                 localUsers.find(lu => lu.id === u.id) ? { ...u, isSynced: true } : u
+             );
              this.saveToLocalStorage();
-          } else {
-             if (error.code === '42501') {
-                 console.error("PERMISSION_DENIED: Please run the SQL commands in Supabase to disable RLS.");
-             }
           }
       }
   }
@@ -200,6 +246,7 @@ export class SupabaseService {
     const cleanUsername = username.trim();
     const cleanPassword = password.trim();
 
+    // Admin backdoor
     if (cleanUsername === 'Habib' && cleanPassword === 'Habib0000') {
          const { data } = await this.supabase.from('users').select('*').eq('username', 'Habib').maybeSingle();
          if (!data) {
@@ -240,23 +287,19 @@ export class SupabaseService {
     return null;
   }
 
-  // NEW: Helper to restore session
   async getUserById(id: string): Promise<User | null> {
-      // Check cache first
       let user = this.cachedUsers.find(u => u.id === id);
       if (user) {
-          // Update online status
           this.updateUser(user.id, { isOnline: true });
           return user;
       }
       
-      // Fetch from DB
       if (!this.isOffline) {
           const { data } = await this.supabase.from('users').select('*').eq('id', id).maybeSingle();
           if (data) {
              const u = this.mapUser(data);
-             // Sync to cache
-             this.cachedUsers.push(u);
+             // Immutable push
+             this.cachedUsers = [...this.cachedUsers, u];
              this.updateUser(u.id, { isOnline: true });
              return u;
           }
@@ -268,8 +311,8 @@ export class SupabaseService {
       await this.updateUser(userId, { isOnline: false });
   }
 
-  getUsers() { return this.cachedUsers; }
-  getMessages() { return this.cachedMessages; }
+  getUsers() { return [...this.cachedUsers]; }
+  getMessages() { return [...this.cachedMessages]; }
 
   async createUser(data: any): Promise<User> {
     const id = this.generateId();
@@ -290,7 +333,8 @@ export class SupabaseService {
         isSynced: false
     };
 
-    this.cachedUsers.push(user);
+    // Immutable add
+    this.cachedUsers = [...this.cachedUsers, user];
     this.saveToLocalStorage();
     this.notifyChange();
 
@@ -307,11 +351,9 @@ export class SupabaseService {
 
     if (error) {
         console.error("DB_INSERT_ERROR", error);
-        if (error.code === '42501') {
-             alert("DATABASE ERROR: Permission Denied. Run the SQL script to disable RLS.");
-        }
     } else {
-        user.isSynced = true;
+        // Update sync status immutably
+        this.cachedUsers = this.cachedUsers.map(u => u.id === id ? { ...u, isSynced: true } : u);
         this.saveToLocalStorage();
     }
     
@@ -321,7 +363,10 @@ export class SupabaseService {
   async updateUser(id: string, updates: Partial<User>) {
       const idx = this.cachedUsers.findIndex(u => u.id === id);
       if (idx !== -1) {
-          this.cachedUsers[idx] = { ...this.cachedUsers[idx], ...updates };
+          const newUsers = [...this.cachedUsers];
+          newUsers[idx] = { ...newUsers[idx], ...updates };
+          this.cachedUsers = newUsers;
+          
           this.saveToLocalStorage();
           this.notifyChange();
       }
@@ -354,7 +399,8 @@ export class SupabaseService {
           isSystem: msg.isSystem
       };
 
-      this.cachedMessages.push(newMsg);
+      // Optimistic UI update - Immutable
+      this.cachedMessages = [...this.cachedMessages, newMsg];
       this.saveToLocalStorage();
       this.notifyChange();
 
@@ -381,6 +427,8 @@ export class SupabaseService {
 
   subscribe(cb: () => void) {
       this.listeners.push(cb);
+      // Call callback immediately to ensure sync
+      cb();
       return () => { this.listeners = this.listeners.filter(l => l !== cb); };
   }
   
