@@ -25,9 +25,18 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, chatPartner
     return mockService.subscribe(update);
   }, []);
 
+  // Scroll to bottom whenever messages change or we switch chats
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, chatPartnerId]);
+    if (bottomRef.current) {
+        bottomRef.current.scrollIntoView({ behavior: 'auto' });
+    }
+  }, [chatPartnerId]); // Immediate scroll on chat switch
+
+  useEffect(() => {
+    if (bottomRef.current) {
+        bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages.length]); // Smooth scroll on new message
 
   const conversation = messages.filter(m => 
       (m.senderId === currentUser.id && m.receiverId === chatPartnerId) ||
@@ -48,7 +57,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, chatPartner
   return (
     <div className="flex flex-col h-full w-full">
         {/* Header */}
-        <div className="h-16 bg-cyber-glass border-b border-cyber-border flex items-center justify-between px-4 z-20">
+        <div className="h-16 bg-cyber-glass border-b border-cyber-border flex items-center justify-between px-4 z-20 shrink-0">
             <div className="flex items-center gap-3">
                 <button onClick={onBack} className="md:hidden text-cyber-green hover:text-white">
                    &lt; BACK
@@ -89,7 +98,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, chatPartner
         </div>
 
         {/* Input */}
-        <div className="p-4 bg-cyber-glass border-t border-cyber-border z-20">
+        <div className="p-4 bg-cyber-glass border-t border-cyber-border z-20 shrink-0">
             {currentUser.canSend ? (
                 <form onSubmit={handleSend} className="flex gap-2">
                     <span className="text-cyber-green py-3">></span>
