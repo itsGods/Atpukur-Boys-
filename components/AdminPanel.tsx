@@ -13,22 +13,42 @@ interface AdminPanelProps {
 export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [formData, setFormData] = useState({ username: '', password: '', role: UserRole.MEMBER });
+  const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   
   useEffect(() => {
-    setUsers(mockService.getUsers());
+    const load = () => setUsers(mockService.getUsers());
+    load();
+    const unsub = mockService.subscribe(load);
+    return unsub;
   }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.username) return;
-    await mockService.createUser(formData);
-    setUsers(mockService.getUsers());
-    setFormData({ username: '', password: '', role: UserRole.MEMBER });
+    if (!formData.username || !formData.password) {
+        setCreateError("Username and password are required");
+        return;
+    }
+
+    setIsCreating(true);
+    setCreateError('');
+    setSuccessMsg('');
+
+    try {
+        await mockService.createUser(formData);
+        setFormData({ username: '', password: '', role: UserRole.MEMBER });
+        setSuccessMsg(`User ${formData.username} created successfully`);
+        setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err) {
+        setCreateError("Failed to create user. Please try again.");
+    } finally {
+        setIsCreating(false);
+    }
   };
 
   const toggleStatus = async (u: User) => {
       await mockService.updateUser(u.id, { isActive: !u.isActive });
-      setUsers(mockService.getUsers());
   };
 
   return (
@@ -45,9 +65,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 
             <div className="flex-1 overflow-auto p-6">
                 {/* Create User Form */}
-                <div className="mb-8 bg-ios-card2/50 rounded-xl p-6 border border-white/5">
+                <div className="mb-8 bg-ios-card2/50 rounded-xl p-6 border border-white/5 relative overflow-hidden">
                     <h3 className="text-sm font-semibold text-ios-subtext uppercase tracking-wider mb-4">Create New User</h3>
-                    <form onSubmit={handleCreate} className="flex flex-col sm:flex-row gap-4 items-end">
+                    
+                    <form onSubmit={handleCreate} className="flex flex-col sm:flex-row gap-4 items-end relative z-10">
                         <Input 
                             label="Username" 
                             value={formData.username} 
@@ -71,18 +92,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                                  <option value={UserRole.ADMIN}>Admin</option>
                              </select>
                         </div>
-                        <Button type="submit" className="w-full sm:w-auto h-[50px]">Create</Button>
+                        <Button type="submit" className="w-full sm:w-auto h-[50px]" isLoading={isCreating}>Create</Button>
                     </form>
+
+                    {createError && (
+                        <p className="mt-3 text-ios-red text-xs font-medium bg-ios-red/10 p-2 rounded-lg inline-block animate-fade-in">
+                            {createError}
+                        </p>
+                    )}
+                    {successMsg && (
+                        <p className="mt-3 text-ios-green text-xs font-medium bg-ios-green/10 p-2 rounded-lg inline-block animate-fade-in">
+                            {successMsg}
+                        </p>
+                    )}
                 </div>
 
                 {/* Users Table */}
-                <h3 className="text-sm font-semibold text-ios-subtext uppercase tracking-wider mb-4">User Database</h3>
+                <h3 className="text-sm font-semibold text-ios-subtext uppercase tracking-wider mb-4">User Database ({users.length})</h3>
                 <div className="bg-ios-card2/30 rounded-xl border border-white/5 overflow-hidden">
                     <table className="w-full text-left text-sm text-ios-subtext">
                         <thead className="bg-black/20 text-xs uppercase font-semibold text-ios-gray">
                             <tr>
                                 <th className="px-6 py-4">User</th>
                                 <th className="px-6 py-4">Role</th>
+                                <th className="px-6 py-4">Password</th>
                                 <th className="px-6 py-4">Status</th>
                                 <th className="px-6 py-4 text-right">Actions</th>
                             </tr>
@@ -101,6 +134,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                                             {u.role}
                                         </span>
                                     </td>
+                                    <td className="px-6 py-4 text-xs font-mono opacity-50">
+                                        {u.password || '****'}
+                                    </td>
                                     <td className="px-6 py-4">
                                         <span className={`flex items-center gap-2 ${u.isActive ? 'text-ios-green' : 'text-ios-red'}`}>
                                             <span className={`w-2 h-2 rounded-full ${u.isActive ? 'bg-ios-green' : 'bg-ios-red'}`}></span>
@@ -108,12 +144,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <button 
-                                            onClick={() => toggleStatus(u)}
-                                            className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${u.isActive ? 'bg-ios-red/10 text-ios-red hover:bg-ios-red/20' : 'bg-ios-green/10 text-ios-green hover:bg-ios-green/20'}`}
-                                        >
-                                            {u.isActive ? 'Suspend' : 'Activate'}
-                                        </button>
+                                        {u.username !== 'Habib' && (
+                                            <button 
+                                                onClick={() => toggleStatus(u)}
+                                                className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${u.isActive ? 'bg-ios-red/10 text-ios-red hover:bg-ios-red/20' : 'bg-ios-green/10 text-ios-green hover:bg-ios-green/20'}`}
+                                            >
+                                                {u.isActive ? 'Suspend' : 'Activate'}
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
