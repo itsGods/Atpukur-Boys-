@@ -8,7 +8,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 export const Input: React.FC<InputProps> = ({ label, error, className = '', ...props }) => {
   return (
     <div className="w-full">
-      {label && <label className="block text-[10px] uppercase tracking-widest text-cyber-green mb-1.5 opacity-80">> {label}</label>}
+      {label && <label className="block text-[10px] uppercase tracking-widest text-cyber-green mb-1.5 opacity-80">&gt; {label}</label>}
       <div className="relative group">
         <input 
           className={`

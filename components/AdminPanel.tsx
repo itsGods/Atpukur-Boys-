@@ -60,13 +60,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             {/* Sidebar Tabs */}
             <div className="w-64 border-r border-cyber-border bg-black/50 p-6 space-y-2">
                 <button onClick={() => setTab('users')} className={`w-full text-left p-3 border ${tab === 'users' ? 'border-cyber-green text-cyber-green bg-cyber-green/10' : 'border-transparent text-cyber-subtext hover:text-white'}`}>
-                    > USER_DATABASE
+                    &gt; USER_DATABASE
                 </button>
                 <button onClick={() => setTab('messages')} className={`w-full text-left p-3 border ${tab === 'messages' ? 'border-cyber-green text-cyber-green bg-cyber-green/10' : 'border-transparent text-cyber-subtext hover:text-white'}`}>
-                    > MESSAGE_LOGS
+                    &gt; MESSAGE_LOGS
                 </button>
                 <button onClick={() => setTab('system')} className={`w-full text-left p-3 border ${tab === 'system' ? 'border-cyber-green text-cyber-green bg-cyber-green/10' : 'border-transparent text-cyber-subtext hover:text-white'}`}>
-                    > SYSTEM_STATS
+                    &gt; SYSTEM_STATS
                 </button>
             </div>
 
@@ -138,7 +138,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                                         <div className="flex-1">
                                             <div className="flex gap-2 text-xs mb-1">
                                                 <span className="text-cyber-blue">{sender}</span>
-                                                <span className="text-cyber-subtext">-></span>
+                                                <span className="text-cyber-subtext">-&gt;</span>
                                                 <span className="text-cyber-subtext">TARGET_ID:{m.receiverId?.slice(0,5)}</span>
                                                 <span className="opacity-50 ml-auto">{new Date(m.timestamp).toLocaleString()}</span>
                                             </div>

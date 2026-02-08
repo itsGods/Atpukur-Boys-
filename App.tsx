@@ -67,7 +67,7 @@ function App() {
                             onClick={() => setActiveChatId(u.id)}
                             className={`w-full text-left px-3 py-2 text-sm hover:bg-cyber-green/10 border border-transparent hover:border-cyber-green/30 transition-all group ${activeChatId === u.id ? 'bg-cyber-green/10 border-cyber-green/30' : ''}`}
                           >
-                              <span className="text-cyber-green group-hover:text-white transition-colors">> {u.username}</span>
+                              <span className="text-cyber-green group-hover:text-white transition-colors">&gt; {u.username}</span>
                           </button>
                       ))}
                       {onlineUsers.length === 0 && <span className="text-xs text-cyber-subtext italic px-3">NO_SIGNAL</span>}
@@ -83,7 +83,7 @@ function App() {
                             onClick={() => setActiveChatId(u.id)}
                             className={`w-full text-left px-3 py-2 text-sm text-cyber-subtext hover:bg-white/5 border border-transparent transition-all ${activeChatId === u.id ? 'bg-white/5' : ''}`}
                           >
-                              > {u.username}
+                              &gt; {u.username}
                           </button>
                       ))}
                   </div>

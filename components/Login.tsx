@@ -62,7 +62,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
                 {error && (
                     <div className="bg-cyber-red/10 border border-cyber-red/30 p-3 text-cyber-red text-xs font-mono animate-pulse-fast">
-                        > ERROR: {error}
+                        &gt; ERROR: {error}
                     </div>
                 )}
 

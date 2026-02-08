@@ -101,7 +101,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, chatPartner
         <div className="p-4 bg-cyber-glass border-t border-cyber-border z-20 shrink-0">
             {currentUser.canSend ? (
                 <form onSubmit={handleSend} className="flex gap-2">
-                    <span className="text-cyber-green py-3">></span>
+                    <span className="text-cyber-green py-3">&gt;</span>
                     <input 
                         value={text}
                         onChange={e => setText(e.target.value)}
