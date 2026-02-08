@@ -12,30 +12,28 @@ export enum MessageStatus {
 export interface User {
   id: string;
   username: string;
-  password?: string; // Only for admin display/reset, normally hashed
+  password?: string;
   role: UserRole;
   isOnline: boolean;
-  avatarUrl?: string;
   lastSeen?: number;
   isActive: boolean;
-  isSynced?: boolean; // True if user exists in Cloud DB
+  canSend: boolean; // Permission to send messages
+  isSynced?: boolean;
 }
 
 export interface Message {
   id: string;
   senderId: string;
-  receiverId?: string; // Optional: If null/undefined/'general', it is a group message
+  receiverId?: string;
   content: string;
   timestamp: number;
   status: MessageStatus;
-  isSystem?: boolean; // For "User added" messages
+  isSystem?: boolean;
 }
 
 export interface ChatSession {
-  id: string; // 'general' or userId for DM
+  id: string;
   name: string;
-  isGroup: boolean;
   participants: string[];
-  lastMessage?: Message;
   unreadCount: number;
 }

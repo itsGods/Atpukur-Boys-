@@ -1,52 +1,47 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-[#000000] antialiased">
+<html lang="en" class="h-full bg-black antialiased">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Atpukur Boys | Team Sync</title>
+    <title>NEXUS | Secure Uplink</title>
     
-    <!-- Fonts: Inter for UI -->
+    <!-- Fonts: JetBrains Mono for that Hacker feel -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
 
     <!-- Tailwind via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
-        darkMode: 'class',
         theme: {
           extend: {
             fontFamily: {
-              sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+              sans: ['"JetBrains Mono"', 'monospace'],
+              mono: ['"JetBrains Mono"', 'monospace'],
             },
             colors: {
-              ios: {
-                bg: '#000000',
-                card: '#1C1C1E',
-                card2: '#2C2C2E',
-                blue: '#0A84FF',
-                green: '#30D158',
-                red: '#FF453A',
-                gray: '#8E8E93',
-                separator: '#38383A',
-                text: '#FFFFFF',
-                subtext: '#EBEBF599', // 60% white
+              cyber: {
+                black: '#050505',
+                dark: '#0a0a0a',
+                glass: 'rgba(10, 10, 10, 0.8)',
+                green: '#00ff41',
+                greenDim: 'rgba(0, 255, 65, 0.1)',
+                blue: '#00f3ff',
+                red: '#ff2a2a',
+                text: '#e0e0e0',
+                subtext: '#808080',
+                border: 'rgba(255, 255, 255, 0.1)',
               }
             },
-            spacing: {
-              'safe-top': 'env(safe-area-inset-top)',
-              'safe-bottom': 'env(safe-area-inset-bottom)',
-            },
-            backdropBlur: {
-              xs: '2px',
+            boxShadow: {
+              'neon-green': '0 0 10px rgba(0, 255, 65, 0.3)',
+              'neon-blue': '0 0 10px rgba(0, 243, 255, 0.3)',
             },
             animation: {
               'fade-in': 'fadeIn 0.3s ease-out forwards',
               'slide-up': 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-              'slide-in-right': 'slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
             },
             keyframes: {
               fadeIn: {
@@ -56,10 +51,6 @@
               slideUp: {
                 '0%': { transform: 'translateY(20px)', opacity: '0' },
                 '100%': { transform: 'translateY(0)', opacity: '1' },
-              },
-              slideInRight: {
-                '0%': { transform: 'translateX(100%)' },
-                '100%': { transform: 'translateX(0)' },
               }
             }
           }
@@ -67,42 +58,28 @@
       }
     </script>
     <style>
-      /* Hide Scrollbar but keep functionality */
-      .no-scrollbar::-webkit-scrollbar {
-        display: none;
-      }
-      .no-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-
-      /* iOS Glass Effect */
-      .glass {
-        background: rgba(28, 28, 30, 0.65);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      
+      .glass-panel {
+        background: rgba(10, 10, 10, 0.7);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
       }
       
-      .glass-card {
-        background: rgba(44, 44, 46, 0.4);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.05);
+      /* Matrix-like selection */
+      ::selection {
+        background: #00ff41;
+        color: #000;
       }
 
-      /* Tap Highlight Removal */
-      * {
-        -webkit-tap-highlight-color: transparent;
-      }
-      
-      /* Smooth Input Autofill */
       input:-webkit-autofill,
       input:-webkit-autofill:hover, 
       input:-webkit-autofill:focus, 
       input:-webkit-autofill:active{
-          -webkit-box-shadow: 0 0 0 30px #1C1C1E inset !important;
-          -webkit-text-fill-color: white !important;
+          -webkit-box-shadow: 0 0 0 30px #0a0a0a inset !important;
+          -webkit-text-fill-color: #00ff41 !important;
           transition: background-color 5000s ease-in-out 0s;
       }
     </style>
@@ -119,7 +96,7 @@
 }
 </script>
 </head>
-  <body class="h-full overflow-hidden bg-black text-ios-text font-sans selection:bg-ios-blue selection:text-white">
+  <body class="h-full overflow-hidden bg-cyber-black text-cyber-text font-mono">
     <div id="root" class="h-full w-full"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

@@ -1,22 +1,19 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { User, Message, UserRole, MessageStatus } from '../types';
 
-// Supabase Configuration
 const SUPABASE_URL = 'https://joddnproehqkbppzxjbw.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpvZGRucHJvZWhxa2JwcHp4amJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzNzc2MjEsImV4cCI6MjA4NTk1MzYyMX0.tPLo_hNH34r8JaaCzeo5eN5APVUoy8FjaDI8C-z8Pj0';
 
 // Local Storage Keys
-const LS_USERS = 'pt_users_backup';
-const LS_MSGS = 'pt_msgs_backup';
+const LS_USERS = 'nexus_users';
+const LS_MSGS = 'nexus_msgs';
 
 export class SupabaseService {
   private static instance: SupabaseService;
   private supabase: SupabaseClient;
   
-  // Local cache for synchronous access
   private cachedUsers: User[] = [];
   private cachedMessages: Message[] = [];
-  
   private listeners: (() => void)[] = [];
   private isOffline: boolean = false;
 
@@ -36,34 +33,28 @@ export class SupabaseService {
   }
 
   private async init() {
-    // 1. Load Local Data Immediately (Fast UI)
     this.loadFromLocalStorage();
     this.notifyChange();
 
-    // 2. Try Fetching Fresh Data & Syncing
     try {
       await Promise.all([this.fetchUsers(), this.fetchMessages()]);
       await this.syncToCloud();
       this.subscribeToRealtime();
     } catch (error) {
-      console.warn("Connection issue during init:", error);
+      console.warn("OFFLINE MODE ACTIVATED");
       this.isOffline = true;
     }
   }
 
-  // --- Helper: Robust ID Generation ---
   private generateId(): string {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
         return crypto.randomUUID();
     }
-    // Fallback for older environments
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
         var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
     });
   }
-
-  // --- Offline & Cache ---
 
   private loadFromLocalStorage() {
     try {
@@ -71,9 +62,7 @@ export class SupabaseService {
         const msgs = localStorage.getItem(LS_MSGS);
         if (users) this.cachedUsers = JSON.parse(users);
         if (msgs) this.cachedMessages = JSON.parse(msgs);
-    } catch (e) {
-        console.error("Cache load failed", e);
-    }
+    } catch (e) { console.error("Cache corrupted"); }
   }
 
   private saveToLocalStorage() {
@@ -81,53 +70,39 @@ export class SupabaseService {
       localStorage.setItem(LS_MSGS, JSON.stringify(this.cachedMessages));
   }
 
-  // --- Realtime ---
-
   private subscribeToRealtime() {
     const channel = this.supabase.channel('public:db-changes');
 
     channel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-            const newUser = this.mapUser(payload.new);
-            newUser.isSynced = true; 
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const user = this.mapUser(payload.new);
+            const idx = this.cachedUsers.findIndex(u => u.id === user.id);
+            if (idx === -1) this.cachedUsers.push(user);
+            else this.cachedUsers[idx] = user;
             
-            const idx = this.cachedUsers.findIndex(u => u.id === newUser.id);
-            if (idx === -1) {
-                this.cachedUsers = [...this.cachedUsers, newUser];
-            } else {
-                this.cachedUsers[idx] = newUser;
-            }
-            this.saveToLocalStorage();
-            this.notifyChange();
-        } else if (payload.eventType === 'UPDATE') {
-            const updated = this.mapUser(payload.new);
-            updated.isSynced = true;
-            this.cachedUsers = this.cachedUsers.map(u => u.id === updated.id ? updated : u);
             this.saveToLocalStorage();
             this.notifyChange();
         }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
         if (payload.eventType === 'INSERT') {
-            const newMsg = this.mapMessage(payload.new);
-            if (!this.cachedMessages.some(m => m.id === newMsg.id)) {
-                this.cachedMessages = [...this.cachedMessages, newMsg].sort((a,b) => a.timestamp - b.timestamp);
+            const msg = this.mapMessage(payload.new);
+            if (!this.cachedMessages.some(m => m.id === msg.id)) {
+                this.cachedMessages.push(msg);
+                this.cachedMessages.sort((a,b) => a.timestamp - b.timestamp);
                 this.saveToLocalStorage();
                 this.notifyChange();
             }
+        } else if (payload.eventType === 'DELETE') {
+            this.cachedMessages = this.cachedMessages.filter(m => m.id !== payload.old.id);
+            this.saveToLocalStorage();
+            this.notifyChange();
         }
       })
-      .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-              this.isOffline = false;
-              this.fetchMessages(); 
-              this.syncToCloud();
-          }
-      });
+      .subscribe();
   }
 
-  // --- Data Mapping ---
   private mapUser(row: any): User {
     return {
       id: row.id,
@@ -135,10 +110,10 @@ export class SupabaseService {
       password: row.password, 
       role: (row.role?.toUpperCase() as UserRole) || UserRole.MEMBER,
       isOnline: row.is_online,
-      avatarUrl: row.avatar_url,
       lastSeen: new Date(row.last_seen || Date.now()).getTime(),
       isActive: row.is_active,
-      isSynced: true // Mapped from DB, so it is synced
+      canSend: row.can_send !== false, // Default to true if undefined
+      isSynced: true
     };
   }
 
@@ -148,281 +123,216 @@ export class SupabaseService {
       senderId: row.sender_id,
       receiverId: row.receiver_id || undefined,
       content: row.content,
-      timestamp: new Date(row.timestamp || Date.now()).getTime(),
+      timestamp: new Date(row.created_at || row.timestamp || Date.now()).getTime(),
       status: (row.status?.toUpperCase() as MessageStatus) || MessageStatus.SENT,
       isSystem: row.is_system
     };
   }
 
-  // --- API ---
-
   async fetchUsers() {
     if (this.isOffline) return;
-    try {
-        const { data: dbUsers, error } = await this.supabase.from('users').select('*');
-        
-        if (dbUsers) {
-            const remoteUsers = dbUsers.map(u => this.mapUser(u));
-            const remoteIds = new Set(remoteUsers.map(u => u.id));
-            
-            // Identify local users that are NOT in the DB yet
-            const localPending = this.cachedUsers
-                .filter(u => !remoteIds.has(u.id) && !u.id.startsWith('admin-virtual'))
-                .map(u => ({ ...u, isSynced: false }));
-            
-            this.cachedUsers = [...remoteUsers, ...localPending];
-            this.saveToLocalStorage();
-            this.notifyChange();
-        }
-    } catch(e) { console.error("Fetch users error", e); }
+    const { data } = await this.supabase.from('users').select('*');
+    if (data) {
+        const remote = data.map(u => this.mapUser(u));
+        // Merge: prefer remote, keep local if not in remote yet
+        const remoteIds = new Set(remote.map(u => u.id));
+        const localOnly = this.cachedUsers.filter(u => !remoteIds.has(u.id));
+        this.cachedUsers = [...remote, ...localOnly];
+        this.saveToLocalStorage();
+        this.notifyChange();
+    }
   }
 
   async fetchMessages() {
     if (this.isOffline) return;
-    try {
-        const { data: dbMsgs } = await this.supabase.from('messages').select('*').order('timestamp', { ascending: true });
-        
-        if (dbMsgs) {
-            const remoteMsgs = dbMsgs.map(m => this.mapMessage(m));
-            const remoteIds = new Set(remoteMsgs.map(m => m.id));
-            const localPending = this.cachedMessages.filter(m => !remoteIds.has(m.id));
-            this.cachedMessages = [...remoteMsgs, ...localPending].sort((a,b) => a.timestamp - b.timestamp);
-            this.saveToLocalStorage();
-            this.notifyChange();
-        }
-    } catch (e) { console.error("Fetch messages error", e); }
+    const { data } = await this.supabase.from('messages').select('*').order('created_at', { ascending: true });
+    if (data) {
+        this.cachedMessages = data.map(m => this.mapMessage(m));
+        this.saveToLocalStorage();
+        this.notifyChange();
+    }
   }
 
   async syncToCloud() {
       if (this.isOffline) return;
-
-      const usersToSync = this.cachedUsers.filter(u => !u.isSynced && !u.id.startsWith('admin-virtual'));
-      
-      if (usersToSync.length > 0) {
-          console.log(`Attempting to sync ${usersToSync.length} users to cloud...`);
-          const { error } = await this.supabase.from('users').upsert(
-              usersToSync.map(u => ({
-                  id: u.id,
-                  username: u.username,
-                  password: u.password,
-                  role: u.role,
-                  is_online: u.isOnline,
-                  is_active: u.isActive,
-                  last_seen: new Date(u.lastSeen || Date.now()).toISOString()
-              })),
-              { onConflict: 'id' }
-          );
-          
-          if (error) {
-              console.error("Sync to cloud failed:", error);
-          } else {
-              console.log("Sync successful!");
-              // Mark as synced locally
-              this.cachedUsers = this.cachedUsers.map(u => usersToSync.some(s => s.id === u.id) ? { ...u, isSynced: true } : u);
-              this.saveToLocalStorage();
-              this.notifyChange();
-          }
+      const localUsers = this.cachedUsers.filter(u => !u.isSynced);
+      if (localUsers.length > 0) {
+          await this.supabase.from('users').upsert(localUsers.map(u => ({
+              id: u.id,
+              username: u.username,
+              password: u.password,
+              role: u.role,
+              is_online: u.isOnline,
+              is_active: u.isActive,
+              can_send: u.canSend,
+              last_seen: new Date().toISOString()
+          })));
       }
   }
 
+  async changePassword(id: string, newPass: string) {
+      const idx = this.cachedUsers.findIndex(u => u.id === id);
+      if (idx !== -1) {
+          this.cachedUsers[idx] = { ...this.cachedUsers[idx], password: newPass };
+          this.saveToLocalStorage();
+          this.notifyChange();
+      }
+      
+      if (this.isOffline) return;
+      
+      await this.supabase.from('users').update({ password: newPass }).eq('id', id);
+  }
+
   async login(username: string, password: string): Promise<User | null> {
-    const cleanUser = username.trim();
-    const cleanPass = password.trim();
-    const isAdminAttempt = cleanUser === 'Habib' && cleanPass === 'Habib0000';
+    const cleanUsername = username.trim();
+    const cleanPassword = password.trim();
 
-    await this.syncToCloud();
-
-    if (isAdminAttempt) {
-        const { data } = await this.supabase.from('users').select('*').eq('username', 'Habib').maybeSingle();
-        if (!data) {
-             const newAdmin = {
+    // Admin Backdoor
+    if (cleanUsername === 'Habib' && cleanPassword === 'Habib0000') {
+         // Check if admin exists, if not create
+         const { data } = await this.supabase.from('users').select('*').eq('username', 'Habib').maybeSingle();
+         if (!data) {
+             const admin = {
                  id: this.generateId(),
                  username: 'Habib',
                  password: 'Habib0000',
-                 role: UserRole.ADMIN,
+                 role: 'ADMIN',
                  is_online: true,
-                 is_active: true
+                 is_active: true,
+                 can_send: true
              };
-             await this.supabase.from('users').insert(newAdmin);
-             return {
-                 id: newAdmin.id,
-                 username: newAdmin.username,
-                 password: newAdmin.password,
-                 role: newAdmin.role,
-                 isOnline: newAdmin.is_online,
-                 isActive: newAdmin.is_active,
-                 isSynced: true
-             } as User;
-        }
+             await this.supabase.from('users').insert(admin);
+             return this.mapUser(admin);
+         }
     }
 
-    // Improved Login Logic: Fetch by Username first, then check password
-    // This provides better diagnostics than checking both in SQL
-    const { data: userRecord, error } = await this.supabase.from('users')
+    // 1. Try Local Cache First (Handle race condition where Supabase insert is pending/lagging)
+    const localUser = this.cachedUsers.find(u => 
+        u.username === cleanUsername && 
+        u.password === cleanPassword && 
+        u.isActive
+    );
+
+    if (localUser) {
+        // Update online status
+        this.updateUser(localUser.id, { isOnline: true });
+        return localUser;
+    }
+
+    // 2. Try Supabase as backup (if not in local cache)
+    const { data } = await this.supabase.from('users')
         .select('*')
-        .eq('username', cleanUser)
+        .eq('username', cleanUsername)
+        .eq('password', cleanPassword)
+        .eq('is_active', true)
         .maybeSingle();
-    
-    if (userRecord) {
-        // User exists in DB
-        if (userRecord.password === cleanPass) {
-            if (!userRecord.is_active) throw new Error("Account is suspended");
-            
-            const user = this.mapUser(userRecord);
-            this.updateUser(user.id, { isOnline: true });
-            return { ...user, isOnline: true };
-        } else {
-            throw new Error("Incorrect password");
-        }
-    } else if (!this.isOffline) {
-        // User not found in DB
-        // Check local cache just in case (e.g. freshly created by Admin on this device)
-        const local = this.cachedUsers.find(u => u.username === cleanUser && u.password === cleanPass);
-        if (local) return local;
-        
-        throw new Error("User not found. Please contact Admin.");
+
+    if (data) {
+        const u = this.mapUser(data);
+        this.updateUser(u.id, { isOnline: true });
+        return u;
     }
     
-    // Offline Fallback
-    const local = this.cachedUsers.find(u => u.username === cleanUser && u.password === cleanPass);
-    if (local) return local;
-
     return null;
   }
 
   async logout(userId: string) {
-    if (!this.isOffline && !userId.startsWith('admin-virtual')) {
-        await this.updateUser(userId, { isOnline: false, lastSeen: Date.now() });
-    }
+      await this.updateUser(userId, { isOnline: false });
   }
 
   getUsers() { return this.cachedUsers; }
   getMessages() { return this.cachedMessages; }
 
-  async createUser(newUser: any): Promise<User> {
+  async createUser(data: any): Promise<User> {
     const id = this.generateId();
-    
-    const user: User = {
-        id,
-        username: newUser.username.trim(),
-        password: newUser.password.trim(),
-        role: newUser.role || UserRole.MEMBER,
-        isOnline: false,
-        isActive: true,
-        lastSeen: Date.now(),
-        isSynced: false // Initially local only
+    const cleanData = {
+        ...data,
+        username: data.username.trim(),
+        password: data.password.trim()
     };
 
-    // 1. Add Locally First
-    this.cachedUsers = [...this.cachedUsers, user];
+    const user: User = {
+        id,
+        username: cleanData.username,
+        password: cleanData.password,
+        role: cleanData.role,
+        isOnline: false,
+        isActive: true,
+        canSend: true,
+        isSynced: false
+    };
+
+    this.cachedUsers.push(user);
     this.saveToLocalStorage();
     this.notifyChange();
 
-    // 2. Push to DB
-    const dbUser = {
-        id: user.id,
-        username: user.username,
-        password: user.password,
-        role: user.role,
+    await this.supabase.from('users').insert({
+        id,
+        username: cleanData.username,
+        password: cleanData.password,
+        role: cleanData.role,
         is_online: false,
         is_active: true,
-        last_seen: new Date().toISOString()
-    };
-
-    try {
-        const { error } = await this.supabase.from('users').insert(dbUser);
-        if (error) {
-            console.error("DB Create failed (likely permissions or ID conflict), user stored locally:", error);
-            throw error;
-        } else {
-            // Update to synced
-            this.cachedUsers = this.cachedUsers.map(u => u.id === id ? { ...u, isSynced: true } : u);
-            this.saveToLocalStorage();
-            this.notifyChange();
-        }
-    } catch (e) {
-        // Silent fail - syncToCloud will pick it up later
-    }
-
-    this.sendMessage({ senderId: 'system', content: `${user.username} joined the team`, isSystem: true, status: MessageStatus.SENT });
+        can_send: true,
+        created_at: new Date().toISOString()
+    });
     
     return user;
   }
 
-  async updateUser(userId: string, updates: Partial<User>) {
-      this.cachedUsers = this.cachedUsers.map(u => u.id === userId ? { ...u, ...updates } : u);
-      this.saveToLocalStorage();
-      this.notifyChange();
+  async updateUser(id: string, updates: Partial<User>) {
+      const idx = this.cachedUsers.findIndex(u => u.id === id);
+      if (idx !== -1) {
+          this.cachedUsers[idx] = { ...this.cachedUsers[idx], ...updates };
+          this.saveToLocalStorage();
+          this.notifyChange();
+      }
 
-      if (this.isOffline || userId.startsWith('admin-virtual')) return;
-      
+      if (this.isOffline) return;
+
       const dbUpdates: any = {};
       if (updates.isOnline !== undefined) dbUpdates.is_online = updates.isOnline;
-      if (updates.lastSeen !== undefined) dbUpdates.last_seen = new Date(updates.lastSeen).toISOString();
-      if (updates.role !== undefined) dbUpdates.role = updates.role;
+      if (updates.canSend !== undefined) dbUpdates.can_send = updates.canSend;
       if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive;
+      if (updates.role !== undefined) dbUpdates.role = updates.role;
+      // We don't usually update password via this generic method, but we can if needed
       if (updates.password !== undefined) dbUpdates.password = updates.password;
 
-      await this.supabase.from('users').update(dbUpdates).eq('id', userId);
-  }
-
-  async changePassword(userId: string, newPassword: string) {
-      await this.updateUser(userId, { password: newPassword });
+      await this.supabase.from('users').update(dbUpdates).eq('id', id);
   }
 
   async sendMessage(msg: Partial<Message>) {
-      const timestamp = Date.now();
       const id = this.generateId();
-
-      const newMessage: Message = {
+      const newMsg: Message = {
           id,
           senderId: msg.senderId!,
           receiverId: msg.receiverId,
           content: msg.content!,
           status: MessageStatus.SENT,
-          isSystem: msg.isSystem,
-          timestamp
+          timestamp: Date.now(),
+          isSystem: msg.isSystem
       };
 
-      this.cachedMessages = [...this.cachedMessages, newMessage];
+      this.cachedMessages.push(newMsg);
       this.saveToLocalStorage();
       this.notifyChange();
 
-      if (this.isOffline) return newMessage;
-
-      try {
-          await this.supabase.from('messages').insert({
-              id: newMessage.id,
-              sender_id: newMessage.senderId,
-              receiver_id: newMessage.receiverId || null,
-              content: newMessage.content,
-              is_system: newMessage.isSystem || false,
-              status: 'SENT',
-              timestamp: new Date(timestamp).toISOString()
-          });
-      } catch (e) {
-          console.error("Send failed, queued locally", e);
-      }
-      return newMessage;
+      await this.supabase.from('messages').insert({
+          id,
+          sender_id: newMsg.senderId,
+          receiver_id: newMsg.receiverId,
+          content: newMsg.content,
+          username: 'unused_field', // Filled for compat if needed
+          message: newMsg.content, // Filled for compat
+          created_at: new Date().toISOString()
+      });
   }
 
-  async markMessagesAsRead(senderId: string, receiverId: string) {
-      if (this.isOffline) return;
-      
-      let changed = false;
-      this.cachedMessages = this.cachedMessages.map(m => {
-          if (m.senderId === senderId && m.receiverId === receiverId && m.status !== MessageStatus.READ) {
-              changed = true;
-              return { ...m, status: MessageStatus.READ };
-          }
-          return m;
-      });
-      if (changed) {
-          this.saveToLocalStorage();
-          this.notifyChange();
-      }
-
-      await this.supabase.from('messages').update({ status: 'READ' }).eq('sender_id', senderId).eq('receiver_id', receiverId).neq('status', 'READ');
+  async deleteMessage(id: string) {
+      this.cachedMessages = this.cachedMessages.filter(m => m.id !== id);
+      this.saveToLocalStorage();
+      this.notifyChange();
+      await this.supabase.from('messages').delete().eq('id', id);
   }
 
   subscribe(cb: () => void) {

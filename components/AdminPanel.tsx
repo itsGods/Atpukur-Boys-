@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { User, UserRole } from '../types';
+import { User, Message, UserRole } from '../types';
 import { mockService } from '../services/storage';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
-import { Avatar } from './ui/Avatar';
 
 interface AdminPanelProps {
   currentUser: User;
@@ -12,186 +11,166 @@ interface AdminPanelProps {
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [users, setUsers] = useState<User[]>([]);
-  const [formData, setFormData] = useState({ username: '', password: '', role: UserRole.MEMBER });
-  const [isCreating, setIsCreating] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [createError, setCreateError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
-  
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [tab, setTab] = useState<'users' | 'messages' | 'system'>('users');
+  const [newUser, setNewUser] = useState({ username: '', password: '' });
+
   useEffect(() => {
-    const load = () => setUsers(mockService.getUsers());
+    const load = () => {
+        setUsers(mockService.getUsers());
+        setMessages(mockService.getMessages());
+    };
     load();
-    const unsub = mockService.subscribe(load);
-    return unsub;
+    return mockService.subscribe(load);
   }, []);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.username || !formData.password) {
-        setCreateError("Username and password are required");
-        return;
-    }
-
-    setIsCreating(true);
-    setCreateError('');
-    setSuccessMsg('');
-
-    try {
-        await mockService.createUser(formData);
-        setFormData({ username: '', password: '', role: UserRole.MEMBER });
-        setSuccessMsg(`User ${formData.username} created successfully`);
-        setTimeout(() => setSuccessMsg(''), 3000);
-    } catch (err) {
-        setCreateError("Failed to create user. Please try again.");
-    } finally {
-        setIsCreating(false);
+    if(newUser.username.trim() && newUser.password.trim()) {
+        await mockService.createUser({ 
+            username: newUser.username.trim(), 
+            password: newUser.password.trim(), 
+            role: UserRole.MEMBER 
+        });
+        setNewUser({ username: '', password: '' });
     }
   };
 
-  const handleForceSync = async () => {
-      setIsSyncing(true);
-      await mockService.syncToCloud();
-      await mockService.fetchUsers();
-      setIsSyncing(false);
-      setSuccessMsg("Cloud Sync Completed");
-      setTimeout(() => setSuccessMsg(''), 3000);
+  const toggleSend = async (u: User) => {
+      await mockService.updateUser(u.id, { canSend: !u.canSend });
   };
 
-  const toggleStatus = async (u: User) => {
-      await mockService.updateUser(u.id, { isActive: !u.isActive });
+  const handleDeleteMsg = async (id: string) => {
+      if(confirm('CONFIRM DELETION?')) {
+          await mockService.deleteMessage(id);
+      }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-fade-in">
-        <div className="w-full max-w-4xl bg-ios-card rounded-2xl border border-white/10 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-            
-            {/* Header */}
-            <div className="h-16 border-b border-ios-separator/50 flex items-center justify-between px-6 shrink-0 bg-ios-card/50">
-                <div className="flex items-center gap-3">
-                    <h2 className="text-lg font-semibold text-white">Admin Console</h2>
-                    <button 
-                        onClick={handleForceSync}
-                        disabled={isSyncing}
-                        className={`text-[10px] px-2 py-1 rounded border border-ios-blue text-ios-blue hover:bg-ios-blue/10 flex items-center gap-1 ${isSyncing ? 'opacity-50' : ''}`}
-                    >
-                        <svg className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                        {isSyncing ? 'Syncing...' : 'Force Cloud Sync'}
-                    </button>
-                </div>
-                <button onClick={onClose} className="p-2 bg-ios-card2 rounded-full hover:bg-white/10">
-                    <svg className="w-5 h-5 text-ios-gray" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+    <div className="fixed inset-0 z-50 bg-cyber-black text-cyber-text font-mono flex flex-col animate-fade-in">
+        {/* Top Bar */}
+        <div className="h-16 border-b border-cyber-green/30 flex items-center justify-between px-6 bg-cyber-dark shadow-neon-green relative z-10">
+            <h1 className="text-xl font-bold text-cyber-green tracking-widest glitch-text">COMMAND_CENTER</h1>
+            <button onClick={onClose} className="text-cyber-red border border-cyber-red/50 px-4 py-1 hover:bg-cyber-red hover:text-black transition-all">
+                EXIT_TERMINAL
+            </button>
+        </div>
+
+        <div className="flex-1 flex overflow-hidden">
+            {/* Sidebar Tabs */}
+            <div className="w-64 border-r border-cyber-border bg-black/50 p-6 space-y-2">
+                <button onClick={() => setTab('users')} className={`w-full text-left p-3 border ${tab === 'users' ? 'border-cyber-green text-cyber-green bg-cyber-green/10' : 'border-transparent text-cyber-subtext hover:text-white'}`}>
+                    > USER_DATABASE
+                </button>
+                <button onClick={() => setTab('messages')} className={`w-full text-left p-3 border ${tab === 'messages' ? 'border-cyber-green text-cyber-green bg-cyber-green/10' : 'border-transparent text-cyber-subtext hover:text-white'}`}>
+                    > MESSAGE_LOGS
+                </button>
+                <button onClick={() => setTab('system')} className={`w-full text-left p-3 border ${tab === 'system' ? 'border-cyber-green text-cyber-green bg-cyber-green/10' : 'border-transparent text-cyber-subtext hover:text-white'}`}>
+                    > SYSTEM_STATS
                 </button>
             </div>
 
-            <div className="flex-1 overflow-auto p-6">
-                {/* Create User Form */}
-                <div className="mb-8 bg-ios-card2/50 rounded-xl p-6 border border-white/5 relative overflow-hidden">
-                    <h3 className="text-sm font-semibold text-ios-subtext uppercase tracking-wider mb-4">Create New User</h3>
-                    
-                    <form onSubmit={handleCreate} className="flex flex-col sm:flex-row gap-4 items-end relative z-10">
-                        <Input 
-                            label="Username" 
-                            value={formData.username} 
-                            onChange={e => setFormData({...formData, username: e.target.value})} 
-                            className="bg-black/20"
-                        />
-                        <Input 
-                            label="Password" 
-                            value={formData.password} 
-                            onChange={e => setFormData({...formData, password: e.target.value})}
-                            className="bg-black/20" 
-                        />
-                        <div className="w-full sm:w-48">
-                             <label className="block text-[13px] font-medium text-ios-subtext mb-2 ml-1">Role</label>
-                             <select 
-                                className="w-full bg-black/20 text-white rounded-xl px-4 py-3.5 border border-white/5 outline-none focus:ring-1 focus:ring-ios-blue"
-                                value={formData.role}
-                                onChange={e => setFormData({...formData, role: e.target.value as UserRole})}
-                             >
-                                 <option value={UserRole.MEMBER}>Member</option>
-                                 <option value={UserRole.ADMIN}>Admin</option>
-                             </select>
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-8 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyber-dark to-black">
+                
+                {tab === 'users' && (
+                    <div className="max-w-4xl mx-auto space-y-8">
+                        <div className="glass-panel p-6">
+                            <h3 className="text-cyber-green border-b border-cyber-green/30 pb-2 mb-4">INITIATE_NEW_UNIT</h3>
+                            <form onSubmit={handleCreateUser} className="flex gap-4 items-end">
+                                <Input label="UNIT_ID" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} placeholder="USERNAME" />
+                                <Input label="ACCESS_KEY" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} placeholder="PASSWORD" />
+                                <Button type="submit">CREATE</Button>
+                            </form>
                         </div>
-                        <Button type="submit" className="w-full sm:w-auto h-[50px]" isLoading={isCreating}>Create</Button>
-                    </form>
 
-                    {createError && (
-                        <p className="mt-3 text-ios-red text-xs font-medium bg-ios-red/10 p-2 rounded-lg inline-block animate-fade-in">
-                            {createError}
-                        </p>
-                    )}
-                    {successMsg && (
-                        <p className="mt-3 text-ios-green text-xs font-medium bg-ios-green/10 p-2 rounded-lg inline-block animate-fade-in">
-                            {successMsg}
-                        </p>
-                    )}
-                </div>
+                        <div className="glass-panel p-6">
+                            <h3 className="text-cyber-green border-b border-cyber-green/30 pb-2 mb-4">UNIT_ROSTER</h3>
+                            <table className="w-full text-left text-sm">
+                                <thead className="text-cyber-subtext border-b border-cyber-border">
+                                    <tr>
+                                        <th className="py-2">IDENTITY</th>
+                                        <th className="py-2">STATUS</th>
+                                        <th className="py-2">PERMISSIONS</th>
+                                        <th className="py-2 text-right">CONTROLS</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-cyber-border">
+                                    {users.map(u => (
+                                        <tr key={u.id} className="hover:bg-white/5">
+                                            <td className="py-3 font-bold">{u.username}</td>
+                                            <td className="py-3">
+                                                <span className={u.isOnline ? 'text-cyber-green' : 'text-cyber-subtext'}>
+                                                    {u.isOnline ? 'ONLINE' : 'OFFLINE'}
+                                                </span>
+                                            </td>
+                                            <td className="py-3">
+                                                <span className={u.canSend ? 'text-cyber-blue' : 'text-cyber-red'}>
+                                                    {u.canSend ? 'WRITE_ENABLED' : 'READ_ONLY'}
+                                                </span>
+                                            </td>
+                                            <td className="py-3 text-right">
+                                                {u.role !== 'ADMIN' && (
+                                                    <button 
+                                                        onClick={() => toggleSend(u)}
+                                                        className={`text-xs px-2 py-1 border ${u.canSend ? 'border-cyber-red text-cyber-red hover:bg-cyber-red/10' : 'border-cyber-green text-cyber-green hover:bg-cyber-green/10'}`}
+                                                    >
+                                                        {u.canSend ? 'REVOKE_WRITE' : 'GRANT_WRITE'}
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
 
-                {/* Users Table */}
-                <h3 className="text-sm font-semibold text-ios-subtext uppercase tracking-wider mb-4">User Database ({users.length})</h3>
-                <div className="bg-ios-card2/30 rounded-xl border border-white/5 overflow-hidden">
-                    <table className="w-full text-left text-sm text-ios-subtext">
-                        <thead className="bg-black/20 text-xs uppercase font-semibold text-ios-gray">
-                            <tr>
-                                <th className="px-6 py-4">User</th>
-                                <th className="px-6 py-4">Sync</th>
-                                <th className="px-6 py-4">Role</th>
-                                <th className="px-6 py-4">Password</th>
-                                <th className="px-6 py-4">Status</th>
-                                <th className="px-6 py-4 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5">
-                            {users.map(u => (
-                                <tr key={u.id} className="hover:bg-white/5 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <Avatar name={u.username} size="sm" isOnline={u.isOnline} />
-                                            <span className="font-medium text-white">{u.username}</span>
+                {tab === 'messages' && (
+                    <div className="max-w-4xl mx-auto glass-panel p-6">
+                        <h3 className="text-cyber-green border-b border-cyber-green/30 pb-2 mb-4">GLOBAL_INTERCEPT_LOG</h3>
+                        <div className="space-y-2">
+                            {messages.slice().reverse().map(m => {
+                                const sender = users.find(u => u.id === m.senderId)?.username || 'UNKNOWN';
+                                return (
+                                    <div key={m.id} className="flex items-center justify-between p-2 hover:bg-white/5 border border-transparent hover:border-cyber-border transition-colors">
+                                        <div className="flex-1">
+                                            <div className="flex gap-2 text-xs mb-1">
+                                                <span className="text-cyber-blue">{sender}</span>
+                                                <span className="text-cyber-subtext">-></span>
+                                                <span className="text-cyber-subtext">TARGET_ID:{m.receiverId?.slice(0,5)}</span>
+                                                <span className="opacity-50 ml-auto">{new Date(m.timestamp).toLocaleString()}</span>
+                                            </div>
+                                            <p className="text-sm font-mono text-white opacity-80">{m.content}</p>
                                         </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        {u.isSynced ? (
-                                            <span className="flex items-center gap-1.5 text-ios-blue text-xs font-medium">
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                                                Synced
-                                            </span>
-                                        ) : (
-                                            <span className="flex items-center gap-1.5 text-orange-400 text-xs font-medium" title="User only exists on this device. Click Force Sync to upload.">
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                                                Local Only
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`px-2 py-1 rounded-md text-xs font-semibold ${u.role === UserRole.ADMIN ? 'bg-purple-500/10 text-purple-400' : 'bg-blue-500/10 text-blue-400'}`}>
-                                            {u.role}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-xs font-mono opacity-50">
-                                        {u.password || '****'}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`flex items-center gap-2 ${u.isActive ? 'text-ios-green' : 'text-ios-red'}`}>
-                                            <span className={`w-2 h-2 rounded-full ${u.isActive ? 'bg-ios-green' : 'bg-ios-red'}`}></span>
-                                            {u.isActive ? 'Active' : 'Suspended'}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        {u.username !== 'Habib' && (
-                                            <button 
-                                                onClick={() => toggleStatus(u)}
-                                                className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${u.isActive ? 'bg-ios-red/10 text-ios-red hover:bg-ios-red/20' : 'bg-ios-green/10 text-ios-green hover:bg-ios-green/20'}`}
-                                            >
-                                                {u.isActive ? 'Suspend' : 'Activate'}
-                                            </button>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                                        <button onClick={() => handleDeleteMsg(m.id)} className="ml-4 text-cyber-red hover:bg-cyber-red/20 p-2">
+                                            [DEL]
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {tab === 'system' && (
+                    <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="glass-panel p-6 flex flex-col items-center justify-center h-40 border-t-4 border-t-cyber-green shadow-neon-green">
+                            <span className="text-4xl font-bold text-white mb-2">{users.length}</span>
+                            <span className="text-cyber-green text-sm tracking-widest">TOTAL_UNITS</span>
+                        </div>
+                        <div className="glass-panel p-6 flex flex-col items-center justify-center h-40 border-t-4 border-t-cyber-blue shadow-neon-blue">
+                            <span className="text-4xl font-bold text-white mb-2">{messages.length}</span>
+                            <span className="text-cyber-blue text-sm tracking-widest">INTERCEPTED_MSGS</span>
+                        </div>
+                        <div className="glass-panel p-6 flex flex-col items-center justify-center h-40 border-t-4 border-t-white">
+                            <span className="text-4xl font-bold text-white mb-2">{users.filter(u => u.isOnline).length}</span>
+                            <span className="text-white text-sm tracking-widest">ACTIVE_SIGNALS</span>
+                        </div>
+                    </div>
+                )}
+
             </div>
         </div>
     </div>
