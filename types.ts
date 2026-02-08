@@ -18,6 +18,7 @@ export interface User {
   avatarUrl?: string;
   lastSeen?: number;
   isActive: boolean;
+  isSynced?: boolean; // True if user exists in Cloud DB
 }
 
 export interface Message {

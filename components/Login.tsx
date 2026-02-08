@@ -27,10 +27,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         if (user) {
             onLogin(user);
         } else {
-            setError("Incorrect username or password");
+            setError("Login failed");
         }
-    } catch (err) {
-        setError("Connection failed. Try again.");
+    } catch (err: any) {
+        // Show specific error from service (e.g. "User not found" or "Incorrect password")
+        setError(err.message || "Connection failed. Try again.");
     } finally {
         setLoading(false);
     }
@@ -86,7 +87,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                 <span className="text-xs text-ios-red font-medium">{error}</span>
                              </div>
                              {/* Always show helper if error occurs for transparency */}
-                             <p className="text-[10px] text-ios-subtext ml-6">
+                             <p className="text-[10px] text-ios-subtext ml-6 opacity-70">
                                  Default admin: <b>Habib</b> / <b>Habib0000</b>
                              </p>
                         </div>

@@ -134,6 +134,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         <thead className="bg-black/20 text-xs uppercase font-semibold text-ios-gray">
                             <tr>
                                 <th className="px-6 py-4">User</th>
+                                <th className="px-6 py-4">Sync</th>
                                 <th className="px-6 py-4">Role</th>
                                 <th className="px-6 py-4">Password</th>
                                 <th className="px-6 py-4">Status</th>
@@ -148,6 +149,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                                             <Avatar name={u.username} size="sm" isOnline={u.isOnline} />
                                             <span className="font-medium text-white">{u.username}</span>
                                         </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        {u.isSynced ? (
+                                            <span className="flex items-center gap-1.5 text-ios-blue text-xs font-medium">
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                                Synced
+                                            </span>
+                                        ) : (
+                                            <span className="flex items-center gap-1.5 text-orange-400 text-xs font-medium" title="User only exists on this device. Click Force Sync to upload.">
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                                Local Only
+                                            </span>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className={`px-2 py-1 rounded-md text-xs font-semibold ${u.role === UserRole.ADMIN ? 'bg-purple-500/10 text-purple-400' : 'bg-blue-500/10 text-blue-400'}`}>

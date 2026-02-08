@@ -40,18 +40,27 @@ export class SupabaseService {
     this.loadFromLocalStorage();
     this.notifyChange();
 
-    // 2. Try Fetching Fresh Data
+    // 2. Try Fetching Fresh Data & Syncing
     try {
       await Promise.all([this.fetchUsers(), this.fetchMessages()]);
-      
-      // 3. Sync Up: Push any local data that is missing from Cloud (Fixes "Admin created user locally" issue)
       await this.syncToCloud();
-
       this.subscribeToRealtime();
     } catch (error) {
       console.warn("Connection issue during init:", error);
       this.isOffline = true;
     }
+  }
+
+  // --- Helper: Robust ID Generation ---
+  private generateId(): string {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    // Fallback for older environments
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
   }
 
   // --- Offline & Cache ---
@@ -81,7 +90,8 @@ export class SupabaseService {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload) => {
         if (payload.eventType === 'INSERT') {
             const newUser = this.mapUser(payload.new);
-            // Only add if we don't have it (or if we have a local version, overwrite it with server version)
+            newUser.isSynced = true; 
+            
             const idx = this.cachedUsers.findIndex(u => u.id === newUser.id);
             if (idx === -1) {
                 this.cachedUsers = [...this.cachedUsers, newUser];
@@ -92,6 +102,7 @@ export class SupabaseService {
             this.notifyChange();
         } else if (payload.eventType === 'UPDATE') {
             const updated = this.mapUser(payload.new);
+            updated.isSynced = true;
             this.cachedUsers = this.cachedUsers.map(u => u.id === updated.id ? updated : u);
             this.saveToLocalStorage();
             this.notifyChange();
@@ -100,7 +111,6 @@ export class SupabaseService {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
         if (payload.eventType === 'INSERT') {
             const newMsg = this.mapMessage(payload.new);
-            // Check existence by ID to prevent duplicates
             if (!this.cachedMessages.some(m => m.id === newMsg.id)) {
                 this.cachedMessages = [...this.cachedMessages, newMsg].sort((a,b) => a.timestamp - b.timestamp);
                 this.saveToLocalStorage();
@@ -111,7 +121,6 @@ export class SupabaseService {
       .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
               this.isOffline = false;
-              // Re-sync on reconnect
               this.fetchMessages(); 
               this.syncToCloud();
           }
@@ -128,7 +137,8 @@ export class SupabaseService {
       isOnline: row.is_online,
       avatarUrl: row.avatar_url,
       lastSeen: new Date(row.last_seen || Date.now()).getTime(),
-      isActive: row.is_active
+      isActive: row.is_active,
+      isSynced: true // Mapped from DB, so it is synced
     };
   }
 
@@ -149,14 +159,16 @@ export class SupabaseService {
   async fetchUsers() {
     if (this.isOffline) return;
     try {
-        const { data: dbUsers } = await this.supabase.from('users').select('*');
+        const { data: dbUsers, error } = await this.supabase.from('users').select('*');
         
         if (dbUsers) {
             const remoteUsers = dbUsers.map(u => this.mapUser(u));
             const remoteIds = new Set(remoteUsers.map(u => u.id));
             
-            // Keep local users that aren't in DB yet (pending sync)
-            const localPending = this.cachedUsers.filter(u => !remoteIds.has(u.id) && !u.id.startsWith('admin-virtual'));
+            // Identify local users that are NOT in the DB yet
+            const localPending = this.cachedUsers
+                .filter(u => !remoteIds.has(u.id) && !u.id.startsWith('admin-virtual'))
+                .map(u => ({ ...u, isSynced: false }));
             
             this.cachedUsers = [...remoteUsers, ...localPending];
             this.saveToLocalStorage();
@@ -173,10 +185,7 @@ export class SupabaseService {
         if (dbMsgs) {
             const remoteMsgs = dbMsgs.map(m => this.mapMessage(m));
             const remoteIds = new Set(remoteMsgs.map(m => m.id));
-            
-            // Keep local messages pending sync
             const localPending = this.cachedMessages.filter(m => !remoteIds.has(m.id));
-
             this.cachedMessages = [...remoteMsgs, ...localPending].sort((a,b) => a.timestamp - b.timestamp);
             this.saveToLocalStorage();
             this.notifyChange();
@@ -184,15 +193,13 @@ export class SupabaseService {
     } catch (e) { console.error("Fetch messages error", e); }
   }
 
-  // === CRITICAL: Sync Local Data to Cloud ===
-  // This pushes any users created locally (when DB was down/blocked) to the server
   async syncToCloud() {
       if (this.isOffline) return;
 
-      const usersToSync = this.cachedUsers.filter(u => !u.id.startsWith('admin-virtual'));
+      const usersToSync = this.cachedUsers.filter(u => !u.isSynced && !u.id.startsWith('admin-virtual'));
       
-      // Upsert users (Insert if not exists, Update if exists)
       if (usersToSync.length > 0) {
+          console.log(`Attempting to sync ${usersToSync.length} users to cloud...`);
           const { error } = await this.supabase.from('users').upsert(
               usersToSync.map(u => ({
                   id: u.id,
@@ -203,9 +210,18 @@ export class SupabaseService {
                   is_active: u.isActive,
                   last_seen: new Date(u.lastSeen || Date.now()).toISOString()
               })),
-              { onConflict: 'id' } // Use ID to identify duplicates
+              { onConflict: 'id' }
           );
-          if (error) console.error("Sync to cloud failed:", error);
+          
+          if (error) {
+              console.error("Sync to cloud failed:", error);
+          } else {
+              console.log("Sync successful!");
+              // Mark as synced locally
+              this.cachedUsers = this.cachedUsers.map(u => usersToSync.some(s => s.id === u.id) ? { ...u, isSynced: true } : u);
+              this.saveToLocalStorage();
+              this.notifyChange();
+          }
       }
   }
 
@@ -214,41 +230,60 @@ export class SupabaseService {
     const cleanPass = password.trim();
     const isAdminAttempt = cleanUser === 'Habib' && cleanPass === 'Habib0000';
 
-    // 1. Force Sync first (in case this device has the user locally but not on cloud)
     await this.syncToCloud();
 
-    // 2. Admin Backdoor
     if (isAdminAttempt) {
-        // Try real login
         const { data } = await this.supabase.from('users').select('*').eq('username', 'Habib').maybeSingle();
         if (!data) {
-             // Create admin if missing
-             await this.supabase.from('users').insert({
-                 id: crypto.randomUUID(),
+             const newAdmin = {
+                 id: this.generateId(),
                  username: 'Habib',
                  password: 'Habib0000',
-                 role: 'ADMIN',
+                 role: UserRole.ADMIN,
                  is_online: true,
                  is_active: true
-             });
+             };
+             await this.supabase.from('users').insert(newAdmin);
+             return {
+                 id: newAdmin.id,
+                 username: newAdmin.username,
+                 password: newAdmin.password,
+                 role: newAdmin.role,
+                 isOnline: newAdmin.is_online,
+                 isActive: newAdmin.is_active,
+                 isSynced: true
+             } as User;
         }
     }
 
-    // 3. Standard Login Query
-    const { data } = await this.supabase.from('users')
+    // Improved Login Logic: Fetch by Username first, then check password
+    // This provides better diagnostics than checking both in SQL
+    const { data: userRecord, error } = await this.supabase.from('users')
         .select('*')
         .eq('username', cleanUser)
-        .eq('password', cleanPass)
-        .eq('is_active', true)
         .maybeSingle();
     
-    if (data) {
-        const user = this.mapUser(data);
-        this.updateUser(user.id, { isOnline: true });
-        return { ...user, isOnline: true };
+    if (userRecord) {
+        // User exists in DB
+        if (userRecord.password === cleanPass) {
+            if (!userRecord.is_active) throw new Error("Account is suspended");
+            
+            const user = this.mapUser(userRecord);
+            this.updateUser(user.id, { isOnline: true });
+            return { ...user, isOnline: true };
+        } else {
+            throw new Error("Incorrect password");
+        }
+    } else if (!this.isOffline) {
+        // User not found in DB
+        // Check local cache just in case (e.g. freshly created by Admin on this device)
+        const local = this.cachedUsers.find(u => u.username === cleanUser && u.password === cleanPass);
+        if (local) return local;
+        
+        throw new Error("User not found. Please contact Admin.");
     }
     
-    // 4. Fallback to Local Cache (if DB read failed but we know the user)
+    // Offline Fallback
     const local = this.cachedUsers.find(u => u.username === cleanUser && u.password === cleanPass);
     if (local) return local;
 
@@ -265,17 +300,17 @@ export class SupabaseService {
   getMessages() { return this.cachedMessages; }
 
   async createUser(newUser: any): Promise<User> {
-    // Generate ID on client to ensure Local and Cloud match perfectly
-    const id = crypto.randomUUID(); 
+    const id = this.generateId();
     
     const user: User = {
         id,
-        username: newUser.username,
-        password: newUser.password,
+        username: newUser.username.trim(),
+        password: newUser.password.trim(),
         role: newUser.role || UserRole.MEMBER,
         isOnline: false,
         isActive: true,
-        lastSeen: Date.now()
+        lastSeen: Date.now(),
+        isSynced: false // Initially local only
     };
 
     // 1. Add Locally First
@@ -296,13 +331,19 @@ export class SupabaseService {
 
     try {
         const { error } = await this.supabase.from('users').insert(dbUser);
-        if (error) throw error;
+        if (error) {
+            console.error("DB Create failed (likely permissions or ID conflict), user stored locally:", error);
+            throw error;
+        } else {
+            // Update to synced
+            this.cachedUsers = this.cachedUsers.map(u => u.id === id ? { ...u, isSynced: true } : u);
+            this.saveToLocalStorage();
+            this.notifyChange();
+        }
     } catch (e) {
-        console.error("DB Create failed, user stored locally:", e);
-        // We suppress the error because 'syncToCloud' will retry later
+        // Silent fail - syncToCloud will pick it up later
     }
 
-    // System Message
     this.sendMessage({ senderId: 'system', content: `${user.username} joined the team`, isSystem: true, status: MessageStatus.SENT });
     
     return user;
@@ -331,7 +372,7 @@ export class SupabaseService {
 
   async sendMessage(msg: Partial<Message>) {
       const timestamp = Date.now();
-      const id = crypto.randomUUID(); // Client-side ID generation
+      const id = this.generateId();
 
       const newMessage: Message = {
           id,
@@ -343,14 +384,12 @@ export class SupabaseService {
           timestamp
       };
 
-      // 1. Optimistic UI
       this.cachedMessages = [...this.cachedMessages, newMessage];
       this.saveToLocalStorage();
       this.notifyChange();
 
       if (this.isOffline) return newMessage;
 
-      // 2. Send to DB
       try {
           await this.supabase.from('messages').insert({
               id: newMessage.id,
