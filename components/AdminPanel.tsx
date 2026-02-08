@@ -14,6 +14,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [formData, setFormData] = useState({ username: '', password: '', role: UserRole.MEMBER });
   const [isCreating, setIsCreating] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [createError, setCreateError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   
@@ -47,6 +48,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     }
   };
 
+  const handleForceSync = async () => {
+      setIsSyncing(true);
+      await mockService.syncToCloud();
+      await mockService.fetchUsers();
+      setIsSyncing(false);
+      setSuccessMsg("Cloud Sync Completed");
+      setTimeout(() => setSuccessMsg(''), 3000);
+  };
+
   const toggleStatus = async (u: User) => {
       await mockService.updateUser(u.id, { isActive: !u.isActive });
   };
@@ -57,7 +67,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             
             {/* Header */}
             <div className="h-16 border-b border-ios-separator/50 flex items-center justify-between px-6 shrink-0 bg-ios-card/50">
-                <h2 className="text-lg font-semibold text-white">Admin Console</h2>
+                <div className="flex items-center gap-3">
+                    <h2 className="text-lg font-semibold text-white">Admin Console</h2>
+                    <button 
+                        onClick={handleForceSync}
+                        disabled={isSyncing}
+                        className={`text-[10px] px-2 py-1 rounded border border-ios-blue text-ios-blue hover:bg-ios-blue/10 flex items-center gap-1 ${isSyncing ? 'opacity-50' : ''}`}
+                    >
+                        <svg className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        {isSyncing ? 'Syncing...' : 'Force Cloud Sync'}
+                    </button>
+                </div>
                 <button onClick={onClose} className="p-2 bg-ios-card2 rounded-full hover:bg-white/10">
                     <svg className="w-5 h-5 text-ios-gray" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
