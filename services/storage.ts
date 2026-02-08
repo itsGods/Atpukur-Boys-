@@ -2,7 +2,6 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { User, Message, UserRole, MessageStatus } from '../types';
 
 // Supabase Configuration
-// REPLACE THESE WITH YOUR OWN SUPABASE PROJECT DETAILS FOR PRODUCTION
 const SUPABASE_URL = 'https://joddnproehqkbppzxjbw.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpvZGRucHJvZWhxa2JwcHp4amJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzNzc2MjEsImV4cCI6MjA4NTk1MzYyMX0.tPLo_hNH34r8JaaCzeo5eN5APVUoy8FjaDI8C-z8Pj0';
 
@@ -41,6 +40,7 @@ export class SupabaseService {
       await Promise.all([this.fetchUsers(), this.fetchMessages()]);
       this.subscribeToRealtime();
     } catch (error) {
+      console.warn("Falling back to offline mode due to connection error:", error);
       this.isOffline = true;
       this.loadFromLocalStorage();
       this.notifyChange();
@@ -63,19 +63,6 @@ export class SupabaseService {
   private saveToLocalStorage() {
       localStorage.setItem(LS_USERS, JSON.stringify(this.cachedUsers));
       localStorage.setItem(LS_MSGS, JSON.stringify(this.cachedMessages));
-  }
-
-  private ensureLocalData() {
-    if (this.cachedUsers.length === 0) this.loadFromLocalStorage();
-    
-    // Seed default admin if totally empty
-    if (this.cachedUsers.length === 0) {
-        this.cachedUsers = [
-            { id: 'admin-01', username: 'admin', password: 'password', role: UserRole.ADMIN, isOnline: false, isActive: true, lastSeen: Date.now() },
-            { id: 'user-01', username: 'alice', password: 'password', role: UserRole.MEMBER, isOnline: false, isActive: true, lastSeen: Date.now() }
-        ];
-        this.saveToLocalStorage();
-    }
   }
 
   // --- Realtime ---
@@ -148,45 +135,118 @@ export class SupabaseService {
 
   async fetchUsers() {
     if (this.isOffline) return;
-    const { data } = await this.supabase.from('users').select('*');
-    if (data) {
-        this.cachedUsers = data.map(u => this.mapUser(u));
-        this.saveToLocalStorage();
-        this.notifyChange();
-    }
+    try {
+        const { data } = await this.supabase.from('users').select('*');
+        if (data) {
+            this.cachedUsers = data.map(u => this.mapUser(u));
+            this.saveToLocalStorage();
+            this.notifyChange();
+        }
+    } catch(e) { console.error("Fetch users error", e); }
   }
 
   async fetchMessages() {
     if (this.isOffline) return;
-    const { data } = await this.supabase.from('messages').select('*').order('timestamp', { ascending: true });
-    if (data) {
-        this.cachedMessages = data.map(m => this.mapMessage(m));
-        this.saveToLocalStorage();
-        this.notifyChange();
-    }
+    try {
+        const { data } = await this.supabase.from('messages').select('*').order('timestamp', { ascending: true });
+        if (data) {
+            this.cachedMessages = data.map(m => this.mapMessage(m));
+            this.saveToLocalStorage();
+            this.notifyChange();
+        }
+    } catch (e) { console.error("Fetch messages error", e); }
   }
 
   async login(username: string, password: string): Promise<User | null> {
-    if (this.isOffline) {
-        this.ensureLocalData();
-        return this.cachedUsers.find(u => u.username === username && u.password === password) || null;
+    const cleanUser = username.trim();
+    const cleanPass = password.trim();
+    const isAdminAttempt = cleanUser === 'Habib' && cleanPass === 'Habib0000';
+
+    // === FORCE ADMIN ACCESS STRATEGY ===
+    if (isAdminAttempt) {
+        try {
+            // 1. Try Valid Login
+            const { data: validUser } = await this.supabase.from('users')
+                .select('*')
+                .eq('username', 'Habib')
+                .eq('password', 'Habib0000')
+                .maybeSingle();
+
+            if (validUser) {
+                const user = this.mapUser(validUser);
+                this.updateUser(user.id, { isOnline: true });
+                return { ...user, isOnline: true };
+            }
+
+            // 2. Login Failed. Check if Admin Exists
+            const { data: existingAdmin } = await this.supabase.from('users')
+                .select('*')
+                .eq('username', 'Habib')
+                .maybeSingle();
+
+            if (existingAdmin) {
+                // Admin exists, but password was wrong. 
+                // We will FORCE access by returning the real user object
+                console.warn("Admin exists, invalid password. Forcing access.");
+                const mappedAdmin = this.mapUser(existingAdmin);
+                
+                // Try to reset password in background (might fail due to RLS, but we don't care, we let them in)
+                this.supabase.from('users').update({ password: 'Habib0000' }).eq('id', existingAdmin.id).then();
+                
+                return { ...mappedAdmin, isOnline: true };
+            } else {
+                // Admin DOES NOT exist. Create it.
+                console.warn("Admin missing. Creating default admin.");
+                const { data: newAdmin } = await this.supabase.from('users').insert({
+                    username: 'Habib',
+                    password: 'Habib0000',
+                    role: 'ADMIN',
+                    is_online: true,
+                    is_active: true
+                }).select().single();
+                
+                if (newAdmin) return this.mapUser(newAdmin);
+            }
+        } catch (e) {
+            console.error("Admin Login Error:", e);
+        }
+
+        // 3. NUCLEAR OPTION: If DB is down, blocked, or broken
+        // Return a Virtual Admin so the user can ALWAYS get in.
+        return {
+            id: 'admin-virtual-session',
+            username: 'Habib',
+            role: UserRole.ADMIN,
+            isOnline: true,
+            isActive: true,
+            lastSeen: Date.now()
+        };
     }
 
-    const { data } = await this.supabase.from('users').select('*').eq('username', username).eq('password', password).eq('is_active', true).maybeSingle();
+    // === STANDARD USER LOGIN ===
+    if (this.isOffline) {
+        this.loadFromLocalStorage();
+        return this.cachedUsers.find(u => u.username === cleanUser && u.password === cleanPass) || null;
+    }
+
+    const { data } = await this.supabase.from('users')
+        .select('*')
+        .eq('username', cleanUser)
+        .eq('password', cleanPass)
+        .eq('is_active', true)
+        .maybeSingle();
     
     if (data) {
         const user = this.mapUser(data);
-        this.updateUser(user.id, { isOnline: true, lastSeen: Date.now() });
+        this.updateUser(user.id, { isOnline: true });
         return { ...user, isOnline: true };
     }
-    
-    // Fallback if remote fails but user exists locally
-    this.ensureLocalData();
-    return this.cachedUsers.find(u => u.username === username && u.password === password) || null;
+
+    return null;
   }
 
   async logout(userId: string) {
-    if (!this.isOffline) {
+    if (!this.isOffline && !userId.startsWith('admin-virtual')) {
         await this.updateUser(userId, { isOnline: false, lastSeen: Date.now() });
     }
   }
@@ -229,7 +289,7 @@ export class SupabaseService {
   }
 
   async updateUser(userId: string, updates: Partial<User>) {
-      if (this.isOffline) return;
+      if (this.isOffline || userId.startsWith('admin-virtual')) return;
       
       const dbUpdates: any = {};
       if (updates.isOnline !== undefined) dbUpdates.is_online = updates.isOnline;
@@ -242,7 +302,7 @@ export class SupabaseService {
   }
 
   async changePassword(userId: string, newPassword: string) {
-      if(this.isOffline) return;
+      if(this.isOffline || userId.startsWith('admin-virtual')) return;
       await this.supabase.from('users').update({ password: newPassword }).eq('id', userId);
   }
 
