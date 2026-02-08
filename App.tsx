@@ -11,12 +11,37 @@ function App() {
   const [users, setUsers] = useState<User[]>([]);
   const [showAdmin, setShowAdmin] = useState(false);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(true);
+
+  // Restore session
+  useEffect(() => {
+    const restoreSession = async () => {
+        const savedId = localStorage.getItem('nexus_session_user_id');
+        if (savedId) {
+            const user = await mockService.getUserById(savedId);
+            if (user) setCurrentUser(user);
+        }
+        setIsRestoring(false);
+    };
+    restoreSession();
+  }, []);
 
   useEffect(() => {
     const update = () => setUsers(mockService.getUsers());
     update();
     return mockService.subscribe(update);
   }, []);
+
+  if (isRestoring) {
+      return (
+          <div className="h-screen w-full bg-cyber-black flex items-center justify-center text-cyber-green font-mono">
+              <div className="flex flex-col items-center gap-4">
+                  <div className="w-12 h-12 border-2 border-cyber-green border-t-transparent rounded-full animate-spin"></div>
+                  <div className="text-xs tracking-widest animate-pulse">RECONNECTING_UPLINK...</div>
+              </div>
+          </div>
+      );
+  }
 
   if (!currentUser) return <Login onLogin={setCurrentUser} />;
 
@@ -25,6 +50,7 @@ function App() {
 
   const handleLogout = async () => {
       await mockService.logout(currentUser.id);
+      localStorage.removeItem('nexus_session_user_id');
       setCurrentUser(null);
   };
 
@@ -55,6 +81,23 @@ function App() {
 
           {/* User List */}
           <div className="flex-1 overflow-y-auto p-4 space-y-6">
+              
+              {/* Public Channel */}
+              <div>
+                  <h3 className="text-[10px] text-cyber-subtext uppercase tracking-widest mb-3 opacity-50 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-cyber-blue rounded-full shadow-neon-blue"></span>
+                      CHANNELS
+                  </h3>
+                  <button 
+                      onClick={() => setActiveChatId('global')}
+                      className={`w-full text-left px-3 py-3 text-sm border transition-all group flex items-center justify-between ${activeChatId === 'global' ? 'bg-cyber-blue/10 border-cyber-blue/30 text-cyber-blue' : 'border-transparent hover:bg-cyber-blue/5 hover:border-cyber-blue/20 text-white'}`}
+                  >
+                      <span className="font-bold tracking-wide"># PUBLIC_CHANNEL</span>
+                      <span className="text-[10px] bg-cyber-blue text-black px-1 rounded-sm">GLOBAL</span>
+                  </button>
+              </div>
+
+              {/* Online Users */}
               <div>
                   <h3 className="text-[10px] text-cyber-subtext uppercase tracking-widest mb-3 opacity-50 flex items-center gap-2">
                       <span className="w-1.5 h-1.5 bg-cyber-green rounded-full animate-pulse"></span>
@@ -74,6 +117,7 @@ function App() {
                   </div>
               </div>
 
+              {/* Offline Users */}
               <div>
                   <h3 className="text-[10px] text-cyber-subtext uppercase tracking-widest mb-3 opacity-50">OFFLINE</h3>
                   <div className="space-y-1">

@@ -41,7 +41,7 @@ export class SupabaseService {
       await this.syncToCloud();
       this.subscribeToRealtime();
     } catch (error) {
-      console.warn("OFFLINE MODE ACTIVATED");
+      console.warn("OFFLINE MODE ACTIVATED: Could not connect to Supabase", error);
       this.isOffline = true;
     }
   }
@@ -71,7 +71,9 @@ export class SupabaseService {
   }
 
   private subscribeToRealtime() {
-    const channel = this.supabase.channel('public:db-changes');
+    this.supabase.removeAllChannels();
+
+    const channel = this.supabase.channel('nexus_realtime');
 
     channel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload) => {
@@ -85,22 +87,25 @@ export class SupabaseService {
             this.notifyChange();
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-            const msg = this.mapMessage(payload.new);
-            if (!this.cachedMessages.some(m => m.id === msg.id)) {
-                this.cachedMessages.push(msg);
-                this.cachedMessages.sort((a,b) => a.timestamp - b.timestamp);
-                this.saveToLocalStorage();
-                this.notifyChange();
-            }
-        } else if (payload.eventType === 'DELETE') {
-            this.cachedMessages = this.cachedMessages.filter(m => m.id !== payload.old.id);
-            this.saveToLocalStorage();
-            this.notifyChange();
-        }
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+          const msg = this.mapMessage(payload.new);
+          if (!this.cachedMessages.some(m => m.id === msg.id)) {
+              this.cachedMessages.push(msg);
+              this.cachedMessages.sort((a,b) => a.timestamp - b.timestamp);
+              this.saveToLocalStorage();
+              this.notifyChange();
+          }
       })
-      .subscribe();
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, (payload) => {
+          this.cachedMessages = this.cachedMessages.filter(m => m.id !== payload.old.id);
+          this.saveToLocalStorage();
+          this.notifyChange();
+      })
+      .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+              console.log('REALTIME_UPLINK_ESTABLISHED');
+          }
+      });
   }
 
   private mapUser(row: any): User {
@@ -112,7 +117,7 @@ export class SupabaseService {
       isOnline: row.is_online,
       lastSeen: new Date(row.last_seen || Date.now()).getTime(),
       isActive: row.is_active,
-      canSend: row.can_send !== false, // Default to true if undefined
+      canSend: row.can_send !== false, 
       isSynced: true
     };
   }
@@ -121,7 +126,7 @@ export class SupabaseService {
     return {
       id: row.id,
       senderId: row.sender_id,
-      receiverId: row.receiver_id || undefined,
+      receiverId: row.receiver_id || 'global',
       content: row.content,
       timestamp: new Date(row.created_at || row.timestamp || Date.now()).getTime(),
       status: (row.status?.toUpperCase() as MessageStatus) || MessageStatus.SENT,
@@ -131,10 +136,13 @@ export class SupabaseService {
 
   async fetchUsers() {
     if (this.isOffline) return;
-    const { data } = await this.supabase.from('users').select('*');
+    const { data, error } = await this.supabase.from('users').select('*');
+    if (error) {
+        console.error("DB_ERROR: Failed to fetch users.", error);
+        return;
+    }
     if (data) {
         const remote = data.map(u => this.mapUser(u));
-        // Merge: prefer remote, keep local if not in remote yet
         const remoteIds = new Set(remote.map(u => u.id));
         const localOnly = this.cachedUsers.filter(u => !remoteIds.has(u.id));
         this.cachedUsers = [...remote, ...localOnly];
@@ -145,9 +153,18 @@ export class SupabaseService {
 
   async fetchMessages() {
     if (this.isOffline) return;
-    const { data } = await this.supabase.from('messages').select('*').order('created_at', { ascending: true });
+    const { data, error } = await this.supabase.from('messages')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(500);
+    
+    if (error) {
+        console.error("DB_ERROR: Failed to fetch messages.", error);
+        return;
+    }
+
     if (data) {
-        this.cachedMessages = data.map(m => this.mapMessage(m));
+        this.cachedMessages = data.reverse().map(m => this.mapMessage(m));
         this.saveToLocalStorage();
         this.notifyChange();
     }
@@ -157,7 +174,7 @@ export class SupabaseService {
       if (this.isOffline) return;
       const localUsers = this.cachedUsers.filter(u => !u.isSynced);
       if (localUsers.length > 0) {
-          await this.supabase.from('users').upsert(localUsers.map(u => ({
+          const { error } = await this.supabase.from('users').upsert(localUsers.map(u => ({
               id: u.id,
               username: u.username,
               password: u.password,
@@ -167,29 +184,23 @@ export class SupabaseService {
               can_send: u.canSend,
               last_seen: new Date().toISOString()
           })));
+          
+          if (!error) {
+             localUsers.forEach(u => u.isSynced = true);
+             this.saveToLocalStorage();
+          } else {
+             if (error.code === '42501') {
+                 console.error("PERMISSION_DENIED: Please run the SQL commands in Supabase to disable RLS.");
+             }
+          }
       }
-  }
-
-  async changePassword(id: string, newPass: string) {
-      const idx = this.cachedUsers.findIndex(u => u.id === id);
-      if (idx !== -1) {
-          this.cachedUsers[idx] = { ...this.cachedUsers[idx], password: newPass };
-          this.saveToLocalStorage();
-          this.notifyChange();
-      }
-      
-      if (this.isOffline) return;
-      
-      await this.supabase.from('users').update({ password: newPass }).eq('id', id);
   }
 
   async login(username: string, password: string): Promise<User | null> {
     const cleanUsername = username.trim();
     const cleanPassword = password.trim();
 
-    // Admin Backdoor
     if (cleanUsername === 'Habib' && cleanPassword === 'Habib0000') {
-         // Check if admin exists, if not create
          const { data } = await this.supabase.from('users').select('*').eq('username', 'Habib').maybeSingle();
          if (!data) {
              const admin = {
@@ -206,34 +217,51 @@ export class SupabaseService {
          }
     }
 
-    // 1. Try Local Cache First (Handle race condition where Supabase insert is pending/lagging)
-    const localUser = this.cachedUsers.find(u => 
-        u.username === cleanUsername && 
-        u.password === cleanPassword && 
-        u.isActive
-    );
+    await this.fetchUsers();
 
-    if (localUser) {
-        // Update online status
-        this.updateUser(localUser.id, { isOnline: true });
-        return localUser;
-    }
-
-    // 2. Try Supabase as backup (if not in local cache)
-    const { data } = await this.supabase.from('users')
+    const { data, error } = await this.supabase.from('users')
         .select('*')
         .eq('username', cleanUsername)
         .eq('password', cleanPassword)
         .eq('is_active', true)
         .maybeSingle();
 
+    if (error) {
+        console.error("LOGIN_DB_ERROR", error);
+        return null;
+    }
+
     if (data) {
         const u = this.mapUser(data);
-        this.updateUser(u.id, { isOnline: true });
+        await this.updateUser(u.id, { isOnline: true });
         return u;
     }
     
     return null;
+  }
+
+  // NEW: Helper to restore session
+  async getUserById(id: string): Promise<User | null> {
+      // Check cache first
+      let user = this.cachedUsers.find(u => u.id === id);
+      if (user) {
+          // Update online status
+          this.updateUser(user.id, { isOnline: true });
+          return user;
+      }
+      
+      // Fetch from DB
+      if (!this.isOffline) {
+          const { data } = await this.supabase.from('users').select('*').eq('id', id).maybeSingle();
+          if (data) {
+             const u = this.mapUser(data);
+             // Sync to cache
+             this.cachedUsers.push(u);
+             this.updateUser(u.id, { isOnline: true });
+             return u;
+          }
+      }
+      return null;
   }
 
   async logout(userId: string) {
@@ -266,7 +294,7 @@ export class SupabaseService {
     this.saveToLocalStorage();
     this.notifyChange();
 
-    await this.supabase.from('users').insert({
+    const { error } = await this.supabase.from('users').insert({
         id,
         username: cleanData.username,
         password: cleanData.password,
@@ -276,6 +304,16 @@ export class SupabaseService {
         can_send: true,
         created_at: new Date().toISOString()
     });
+
+    if (error) {
+        console.error("DB_INSERT_ERROR", error);
+        if (error.code === '42501') {
+             alert("DATABASE ERROR: Permission Denied. Run the SQL script to disable RLS.");
+        }
+    } else {
+        user.isSynced = true;
+        this.saveToLocalStorage();
+    }
     
     return user;
   }
@@ -295,18 +333,21 @@ export class SupabaseService {
       if (updates.canSend !== undefined) dbUpdates.can_send = updates.canSend;
       if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive;
       if (updates.role !== undefined) dbUpdates.role = updates.role;
-      // We don't usually update password via this generic method, but we can if needed
       if (updates.password !== undefined) dbUpdates.password = updates.password;
 
-      await this.supabase.from('users').update(dbUpdates).eq('id', id);
+      if (Object.keys(dbUpdates).length > 0) {
+        await this.supabase.from('users').update(dbUpdates).eq('id', id);
+      }
   }
 
   async sendMessage(msg: Partial<Message>) {
       const id = this.generateId();
+      const receiverId = msg.receiverId || 'global';
+      
       const newMsg: Message = {
           id,
           senderId: msg.senderId!,
-          receiverId: msg.receiverId,
+          receiverId: receiverId,
           content: msg.content!,
           status: MessageStatus.SENT,
           timestamp: Date.now(),
@@ -317,15 +358,18 @@ export class SupabaseService {
       this.saveToLocalStorage();
       this.notifyChange();
 
-      await this.supabase.from('messages').insert({
+      const { error } = await this.supabase.from('messages').insert({
           id,
           sender_id: newMsg.senderId,
-          receiver_id: newMsg.receiverId,
+          receiver_id: receiverId,
           content: newMsg.content,
-          username: 'unused_field', // Filled for compat if needed
-          message: newMsg.content, // Filled for compat
+          status: 'SENT',
           created_at: new Date().toISOString()
       });
+
+      if (error) {
+          console.error("MESSAGE_SEND_ERROR", error);
+      }
   }
 
   async deleteMessage(id: string) {

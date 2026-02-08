@@ -22,7 +22,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     try {
         await new Promise(r => setTimeout(r, 800)); // Simulate connection delay
         const user = await mockService.login(username, password);
-        if (user) onLogin(user);
+        if (user) {
+            localStorage.setItem('nexus_session_user_id', user.id);
+            onLogin(user);
+        }
         else setError("ACCESS DENIED: INVALID CREDENTIALS");
     } catch (e) {
         setError("SYSTEM FAILURE: CONNECTION REFUSED");
@@ -39,7 +42,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         <div className="w-full max-w-md relative z-10 glass-panel p-8 border-l-4 border-l-cyber-green shadow-2xl animate-fade-in">
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-cyber-green tracking-tighter mb-2 glitch-text">
-                    NEXUS<span className="text-white">_UPLINK</span>
+                    ATPUKUR<span className="text-white">_GUYS</span>
                 </h1>
                 <p className="text-cyber-subtext text-xs uppercase tracking-widest">Secure Communication Protocol v4.0</p>
             </div>
